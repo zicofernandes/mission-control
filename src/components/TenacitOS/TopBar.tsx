@@ -57,7 +57,7 @@ export function TopBar() {
               letterSpacing: "-0.5px",
             }}
           >
-            {process.env.NEXT_PUBLIC_APP_TITLE || "Mission Control"}
+            {"Mission Control — Limitless Era"}
           </h1>
           {/* Version Badge */}
           <div
@@ -151,7 +151,7 @@ export function TopBar() {
                 color: "var(--text-secondary)",
               }}
             >
-              {process.env.NEXT_PUBLIC_OWNER_USERNAME || "Admin"}
+              {"Zico"}
             </span>
           </div>
         </div>
