@@ -27,10 +27,19 @@ export async function GET() {
     let diskUsed = 0;
     let diskTotal = 100;
     try {
-      const { stdout } = await execAsync("df -BG / | tail -1");
-      const parts = stdout.trim().split(/\s+/);
-      diskTotal = parseInt(parts[1].replace("G", ""));
-      diskUsed = parseInt(parts[2].replace("G", ""));
+      if (process.platform === "darwin") {
+        // macOS: df -g uses 1G blocks
+        const { stdout } = await execAsync("df -g / | tail -1");
+        const parts = stdout.trim().split(/\s+/);
+        diskTotal = parseInt(parts[1]);
+        diskUsed = parseInt(parts[2]);
+      } else {
+        // Linux
+        const { stdout } = await execAsync("df -BG / | tail -1");
+        const parts = stdout.trim().split(/\s+/);
+        diskTotal = parseInt(parts[1].replace("G", ""));
+        diskUsed = parseInt(parts[2].replace("G", ""));
+      }
     } catch (error) {
       console.error("Failed to get disk stats:", error);
     }

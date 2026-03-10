@@ -1,5 +1,5 @@
 /**
- * Weather API - Madrid
+ * Weather API - Flower Mound, TX
  * GET /api/weather
  * Uses Open-Meteo (free, no API key)
  */
@@ -40,8 +40,8 @@ export async function GET() {
   }
 
   try {
-    // Madrid coordinates: 40.4168° N, 3.7038° W
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=40.4168&longitude=-3.7038&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,precipitation&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Europe%2FMadrid&forecast_days=3';
+    // Flower Mound, TX coordinates: 33.0145° N, 97.0975° W
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=33.0145&longitude=-97.0975&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,precipitation&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=America%2FChicago&forecast_days=3';
 
     const res = await fetch(url, { next: { revalidate: 600 } });
     const json = await res.json();
@@ -52,7 +52,7 @@ export async function GET() {
     const wmo = WMO_CODES[current.weather_code] || { label: "Unknown", emoji: "🌡️" };
 
     const data = {
-      city: "Madrid",
+      city: "Flower Mound, TX",
       temp: Math.round(current.temperature_2m),
       feels_like: Math.round(current.apparent_temperature),
       humidity: current.relative_humidity_2m,

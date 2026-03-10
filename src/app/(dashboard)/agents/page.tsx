@@ -109,7 +109,7 @@ export default function AgentsPage() {
       <div className="flex gap-2 mb-6 border-b" style={{ borderColor: "var(--border)" }}>
         {[
           { id: "cards" as const, label: "Agent Cards", icon: LayoutGrid },
-          { id: "organigrama" as const, label: "Organigrama", icon: GitBranch },
+          { id: "organigrama" as const, label: "Org Chart", icon: GitBranch },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -117,7 +117,6 @@ export default function AgentsPage() {
             className="flex items-center gap-2 px-4 py-2 font-medium transition-all"
             style={{
               color: activeTab === id ? "var(--accent)" : "var(--text-secondary)",
-              borderBottom: activeTab === id ? "2px solid var(--accent)" : "2px solid transparent",
               background: "none", border: "none", cursor: "pointer",
               borderBottomStyle: "solid",
               borderBottomWidth: "2px",

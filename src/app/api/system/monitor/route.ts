@@ -6,11 +6,19 @@ import os from "os";
 const execAsync = promisify(exec);
 
 // Services monitored per backend
-const SYSTEMD_SERVICES = ["mission-control"];
+const SYSTEMD_SERVICES: string[] = [];
 const PM2_SERVICES = ["classvault", "content-vault", "postiz-simple", "brain"];
 // creatoros not deployed yet — shown as "not_deployed"
 const PLACEHOLDER_SERVICES = [
   { name: "creatoros", description: "Creatoros Platform", status: "not_deployed" },
+];
+
+// Limitless Era HTTP-port services (macOS launchd/tmux — checked via curl)
+const HTTP_SERVICES: Array<{ name: string; description: string; port: number; backend: string }> = [
+  { name: "elon-gateway",    description: "Elon Agent — OpenClaw Gateway",     port: 19001, backend: "launchctl" },
+  { name: "athena-gateway",  description: "Athena Agent — OpenClaw Gateway",   port: 18789, backend: "launchctl" },
+  { name: "mission-control", description: "Mission Control — Dashboard",        port: 3000,  backend: "tmux"      },
+  { name: "qmd-http",        description: "qmd — Vector Search HTTP API",       port: 8181,  backend: "launchctl" },
 ];
 
 interface ServiceEntry {
@@ -60,7 +68,7 @@ function normalizePm2Status(status: string): string {
 
 // Friendly display names for PM2 process names
 const SERVICE_DESCRIPTIONS: Record<string, string> = {
-  "mission-control": "Mission Control – Tenacitas Dashboard",
+  "mission-control": "Mission Control – Dashboard",
   classvault: "ClassVault – LMS Platform",
   "content-vault": "Content Vault – Draft Management Webapp",
   "postiz-simple": "Postiz – Social Media Scheduler",
@@ -134,6 +142,24 @@ export async function GET() {
 
     // ── Services ─────────────────────────────────────────────────────────────
     const services: ServiceEntry[] = [];
+
+    // 0. Limitless Era HTTP services (port check via curl)
+    for (const svc of HTTP_SERVICES) {
+      try {
+        const { stdout } = await execAsync(`curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://localhost:${svc.port}/ 2>/dev/null || echo "000"`);
+        const code = parseInt(stdout.trim());
+        const isUp = code > 0 && code < 500;
+        services.push({
+          name: svc.name,
+          status: isUp ? "active" : "inactive",
+          description: svc.description,
+          backend: svc.backend,
+          pid: null,
+        });
+      } catch {
+        services.push({ name: svc.name, status: "inactive", description: svc.description, backend: svc.backend, pid: null });
+      }
+    }
 
     // 1. Systemd services
     for (const name of SYSTEMD_SERVICES) {

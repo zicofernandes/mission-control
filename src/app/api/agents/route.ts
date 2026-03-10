@@ -57,86 +57,107 @@ function getAgentDisplayInfo(agentId: string, agentConfig: any): { emoji: string
 
 export async function GET() {
   try {
-    // Read openclaw config
-    const configPath = (process.env.OPENCLAW_DIR || "/root/.openclaw") + "/openclaw.json";
-    const config = JSON.parse(readFileSync(configPath, "utf-8"));
+    // Support multiple openclaw directories via OPENCLAW_DIRS (comma-separated)
+    // Fallback to single OPENCLAW_DIR for backwards compatibility
+    const dirsEnv = process.env.OPENCLAW_DIRS || process.env.OPENCLAW_DIR || "/root/.openclaw";
+    const openclawDirs = dirsEnv.split(",").map((d) => d.trim()).filter(Boolean);
 
-    // Get agents from config
-    const agents: Agent[] = config.agents.list.map((agent: any) => {
-      const agentInfo = getAgentDisplayInfo(agent.id, agent);
+    const allAgents: Agent[] = [];
 
-      // Get telegram account info
-      const telegramAccount =
-        config.channels?.telegram?.accounts?.[agent.id];
-      const botToken = telegramAccount?.botToken;
-
-      // Check if agent has recent activity
-      const memoryPath = join(agent.workspace, "memory");
-      let lastActivity = undefined;
-      let status: "online" | "offline" = "offline";
-
+    for (const openclawDir of openclawDirs) {
+      let config: any;
       try {
-        const today = new Date().toISOString().split("T")[0];
-        const memoryFile = join(memoryPath, `${today}.md`);
-        const stat = require("fs").statSync(memoryFile);
-        lastActivity = stat.mtime.toISOString();
-        // Consider online if activity within last 5 minutes
-        status =
-          Date.now() - stat.mtime.getTime() < 5 * 60 * 1000
-            ? "online"
-            : "offline";
+        const configPath = openclawDir + "/openclaw.json";
+        config = JSON.parse(readFileSync(configPath, "utf-8"));
       } catch (e) {
-        // No recent activity
+        console.error(`Failed to read config from ${openclawDir}:`, e);
+        continue;
       }
 
-      // Get details of allowed subagents
-      const allowAgents = agent.subagents?.allowAgents || [];
-      const allowAgentsDetails = allowAgents.map((subagentId: string) => {
-        // Find subagent in config
-        const subagentConfig = config.agents.list.find(
-          (a: any) => a.id === subagentId
-        );
-        if (subagentConfig) {
-          const subagentInfo = getAgentDisplayInfo(subagentId, subagentConfig);
+      const defaultWorkspace = config.agents?.defaults?.workspace || openclawDir + "/workspace";
+
+      // Get agents from config
+      const dirAgents: Agent[] = (config.agents?.list || []).map((agent: any) => {
+        const agentInfo = getAgentDisplayInfo(agent.id, agent);
+
+        // Get telegram account info
+        const telegramAccount =
+          config.channels?.telegram?.accounts?.[agent.id];
+        const botToken = telegramAccount?.botToken;
+
+        // Resolve workspace — agent-level takes priority, then defaults, then fallback
+        const resolvedWorkspace = agent.workspace || defaultWorkspace;
+
+        // Check if agent has recent activity
+        const memoryPath = join(resolvedWorkspace, "memory");
+        let lastActivity = undefined;
+        let status: "online" | "offline" = "offline";
+
+        try {
+          const today = new Date().toISOString().split("T")[0];
+          const memoryFile = join(memoryPath, `${today}.md`);
+          const stat = require("fs").statSync(memoryFile);
+          lastActivity = stat.mtime.toISOString();
+          // Consider online if activity within last 5 minutes
+          status =
+            Date.now() - stat.mtime.getTime() < 5 * 60 * 1000
+              ? "online"
+              : "offline";
+        } catch (e) {
+          // No recent activity
+        }
+
+        // Get details of allowed subagents
+        const allowAgents = agent.subagents?.allowAgents || [];
+        const allowAgentsDetails = allowAgents.map((subagentId: string) => {
+          // Find subagent in config
+          const subagentConfig = config.agents?.list?.find(
+            (a: any) => a.id === subagentId
+          );
+          if (subagentConfig) {
+            const subagentInfo = getAgentDisplayInfo(subagentId, subagentConfig);
+            return {
+              id: subagentId,
+              name: subagentConfig.name || subagentInfo.name,
+              emoji: subagentInfo.emoji,
+              color: subagentInfo.color,
+            };
+          }
+          // Fallback if subagent not found in config
+          const fallbackInfo = getAgentDisplayInfo(subagentId, null);
           return {
             id: subagentId,
-            name: subagentConfig.name || subagentInfo.name,
-            emoji: subagentInfo.emoji,
-            color: subagentInfo.color,
+            name: fallbackInfo.name,
+            emoji: fallbackInfo.emoji,
+            color: fallbackInfo.color,
           };
-        }
-        // Fallback if subagent not found in config
-        const fallbackInfo = getAgentDisplayInfo(subagentId, null);
+        });
+
         return {
-          id: subagentId,
-          name: fallbackInfo.name,
-          emoji: fallbackInfo.emoji,
-          color: fallbackInfo.color,
+          id: agent.id,
+          name: agent.name || agentInfo.name,
+          emoji: agentInfo.emoji,
+          color: agentInfo.color,
+          model:
+            agent.model?.primary || config.agents?.defaults?.model?.primary || "unknown",
+          workspace: resolvedWorkspace,
+          dmPolicy:
+            telegramAccount?.dmPolicy ||
+            config.channels?.telegram?.dmPolicy ||
+            "pairing",
+          allowAgents,
+          allowAgentsDetails,
+          botToken: botToken ? "configured" : undefined,
+          status,
+          lastActivity,
+          activeSessions: 0, // TODO: get from sessions API
         };
       });
 
-      return {
-        id: agent.id,
-        name: agent.name || agentInfo.name,
-        emoji: agentInfo.emoji,
-        color: agentInfo.color,
-        model:
-          agent.model?.primary || config.agents.defaults.model.primary,
-        workspace: agent.workspace,
-        dmPolicy:
-          telegramAccount?.dmPolicy ||
-          config.channels?.telegram?.dmPolicy ||
-          "pairing",
-        allowAgents,
-        allowAgentsDetails,
-        botToken: botToken ? "configured" : undefined,
-        status,
-        lastActivity,
-        activeSessions: 0, // TODO: get from sessions API
-      };
-    });
+      allAgents.push(...dirAgents);
+    }
 
-    return NextResponse.json({ agents });
+    return NextResponse.json({ agents: allAgents });
   } catch (error) {
     console.error("Error reading agents:", error);
     return NextResponse.json(
