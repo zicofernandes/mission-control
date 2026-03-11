@@ -10,6 +10,8 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
   let lastId: string | null = null;
   let closed = false;
+  const { searchParams } = new URL(request.url);
+  const agent = searchParams.get('agent') || undefined;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
         if (closed) return;
 
         try {
-          const result = getActivities({ limit: 10, sort: 'newest' });
+          const result = getActivities({ limit: 10, sort: 'newest', agent });
           const activities = result.activities;
 
           if (activities.length > 0) {

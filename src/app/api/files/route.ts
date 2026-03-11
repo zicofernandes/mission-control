@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
-const OPENCLAW_DIR = process.env.OPENCLAW_DIR || "/root/.openclaw";
+import { resolveWorkspacePath } from "@/lib/workspaces";
 
 // Files to show in the memory browser
 const ROOT_FILES = ["MEMORY.md", "SOUL.md", "USER.md", "AGENTS.md", "TOOLS.md", "IDENTITY.md"];
@@ -101,10 +101,10 @@ export async function GET(request: NextRequest) {
 
   try {
     // Determine workspace path
-    const workspacePath = path.join(OPENCLAW_DIR, workspace);
+    const workspacePath = resolveWorkspacePath(workspace);
     
     // Validate workspace exists
-    if (!(await fileExists(workspacePath))) {
+    if (!workspacePath || !(await fileExists(workspacePath))) {
       return NextResponse.json(
         { error: "Workspace not found" },
         { status: 404 }
@@ -165,10 +165,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const workspacePath = path.join(OPENCLAW_DIR, workspace);
+    const workspacePath = resolveWorkspacePath(workspace);
     
     // Validate workspace exists
-    if (!(await fileExists(workspacePath))) {
+    if (!workspacePath || !(await fileExists(workspacePath))) {
       return NextResponse.json(
         { error: "Workspace not found" },
         { status: 404 }

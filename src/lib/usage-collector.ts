@@ -1,15 +1,11 @@
 /**
- * Usage Collector - Reads OpenClaw session data and calculates costs
+ * Usage Collector - Reads gateway session data and calculates costs
  */
 
-import { exec } from "child_process";
-import { promisify } from "util";
-import { calculateCost, normalizeModelId } from "./pricing";
+import { calculateCost, normalizeModelId } from "./pricing.ts";
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-
-const execAsync = promisify(exec);
 
 export interface SessionData {
   agentId: string;
@@ -35,45 +31,103 @@ export interface UsageSnapshot {
   cost: number;
 }
 
-/**
- * Get current OpenClaw status with session data
- */
-export async function getOpenClawStatus(): Promise<any> {
-  try {
-    const { stdout } = await execAsync("openclaw status --json");
-    return JSON.parse(stdout);
-  } catch (error) {
-    console.error("Error getting OpenClaw status:", error);
-    throw error;
+export interface GatewaySession {
+  agent: string;
+  key: string;
+  sessionId?: string;
+  model?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  updatedAt?: number;
+  percentUsed?: number;
+}
+
+const GATEWAY_SOURCES = [
+  { agent: "athena", port: 18789 },
+  { agent: "elon", port: 19001 },
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getGatewaySessions(payload: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(payload)) {
+    return payload.filter(isRecord);
   }
+
+  if (isRecord(payload) && Array.isArray(payload.sessions)) {
+    return payload.sessions.filter(isRecord);
+  }
+
+  return [];
+}
+
+export async function queryGatewayUsage(
+  fetchImpl: typeof fetch = fetch,
+): Promise<GatewaySession[]> {
+  const results = await Promise.all(
+    GATEWAY_SOURCES.map(async ({ agent, port }) => {
+      try {
+        const response = await fetchImpl(`http://localhost:${port}/api/sessions`, {
+          signal: AbortSignal.timeout(2000),
+        });
+
+        if (!response.ok) {
+          console.warn("Gateway returned non-OK status:", response.status, port);
+          return [];
+        }
+
+        const payload = (await response.json()) as unknown;
+        return getGatewaySessions(payload).map((session) => ({
+          agent,
+          key: typeof session.key === "string" ? session.key : "",
+          sessionId:
+            typeof session.sessionId === "string" ? session.sessionId : undefined,
+          model: typeof session.model === "string" ? session.model : undefined,
+          inputTokens:
+            typeof session.inputTokens === "number" ? session.inputTokens : 0,
+          outputTokens:
+            typeof session.outputTokens === "number" ? session.outputTokens : 0,
+          totalTokens:
+            typeof session.totalTokens === "number" ? session.totalTokens : 0,
+          updatedAt: typeof session.updatedAt === "number" ? session.updatedAt : 0,
+          percentUsed:
+            typeof session.percentUsed === "number" ? session.percentUsed : 0,
+        }));
+      } catch (error) {
+        console.warn("Failed to fetch usage from gateway:", error);
+        return [];
+      }
+    }),
+  );
+
+  return results.flat();
 }
 
 /**
- * Extract session data from status
+ * Extract session data from merged gateway sessions
  */
-export function extractSessionData(status: any): SessionData[] {
+export function extractSessionData(sessionsWithAgent: GatewaySession[]): SessionData[] {
   const sessions: SessionData[] = [];
 
-  if (!status.sessions?.byAgent) {
-    return sessions;
-  }
-
-  for (const agentGroup of status.sessions.byAgent) {
-    const agentId = agentGroup.agentId;
-
-    for (const session of agentGroup.recent || []) {
-      sessions.push({
-        agentId,
-        sessionKey: session.key,
-        sessionId: session.sessionId,
-        model: normalizeModelId(session.model || "unknown"),
-        inputTokens: session.inputTokens || 0,
-        outputTokens: session.outputTokens || 0,
-        totalTokens: session.totalTokens || 0,
-        updatedAt: session.updatedAt,
-        percentUsed: session.percentUsed || 0,
-      });
+  for (const session of sessionsWithAgent) {
+    if (!session.key) {
+      continue;
     }
+
+    sessions.push({
+      agentId: session.agent,
+      sessionKey: session.key,
+      sessionId: session.sessionId || session.key,
+      model: normalizeModelId(session.model || "unknown"),
+      inputTokens: session.inputTokens || 0,
+      outputTokens: session.outputTokens || 0,
+      totalTokens: session.totalTokens || 0,
+      updatedAt: session.updatedAt || 0,
+      percentUsed: session.percentUsed || 0,
+    });
   }
 
   return sessions;
@@ -194,13 +248,14 @@ export function saveSnapshot(
  * Collect and save current usage data
  * This captures a point-in-time snapshot of current session totals
  */
-export async function collectUsage(dbPath: string): Promise<void> {
+export async function collectUsage(
+  dbPath: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
   const db = initDatabase(dbPath);
 
   try {
-    // Get current status
-    const status = await getOpenClawStatus();
-    const sessions = extractSessionData(status);
+    const sessions = extractSessionData(await queryGatewayUsage(fetchImpl));
     const timestamp = Date.now();
     const snapshots = calculateSnapshot(sessions, timestamp);
 

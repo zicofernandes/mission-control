@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-
-const OPENCLAW_DIR = process.env.OPENCLAW_DIR || "/root/.openclaw";
+import { resolveWorkspacePath } from "@/lib/workspaces";
 
 interface FileEntry {
   name: string;
@@ -20,9 +19,16 @@ export async function GET(request: NextRequest) {
     const rawMode = searchParams.get("raw") === "true";
     
     // Determine BASE_PATH based on workspace
-    const BASE_PATH = path.join(OPENCLAW_DIR, workspace);
+    const BASE_PATH = resolveWorkspacePath(workspace);
     
     // Validate workspace exists
+    if (!BASE_PATH) {
+      return NextResponse.json(
+        { error: "Workspace not found" },
+        { status: 404 }
+      );
+    }
+
     try {
       await fs.access(BASE_PATH);
     } catch {

@@ -7,8 +7,6 @@ import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'activities.db');
-
 export type ActivityType =
   | 'file'
   | 'search'
@@ -42,24 +40,25 @@ export interface Activity {
 }
 
 let _db: Database.Database | null = null;
+let _dbPath: string | null = null;
 
-function getDb(): Database.Database {
-  if (_db) return _db;
+function getOpenclawDirs(env: NodeJS.ProcessEnv = process.env): string[] {
+  const dirsEnv = env.OPENCLAW_DIRS || env.OPENCLAW_DIR || '';
+  return dirsEnv.split(',').map((dir) => dir.trim()).filter(Boolean);
+}
 
-  // Ensure data dir
-  const dataDir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+export function getActivitiesDbPath(env: NodeJS.ProcessEnv = process.env): string {
+  const [primaryOpenclawDir] = getOpenclawDirs(env);
+
+  if (primaryOpenclawDir) {
+    return path.join(primaryOpenclawDir, 'workspace', 'mission-control', 'data', 'activities.db');
   }
 
-  _db = new Database(DB_PATH);
+  return path.join(process.cwd(), 'data', 'activities.db');
+}
 
-  // WAL mode for better concurrency
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('synchronous = NORMAL');
-
-  // Create table
-  _db.exec(`
+function ensureSchema(db: Database.Database): void {
+  db.exec(`
     CREATE TABLE IF NOT EXISTS activities (
       id TEXT PRIMARY KEY,
       timestamp TEXT NOT NULL,
@@ -71,16 +70,75 @@ function getDb(): Database.Database {
       agent TEXT,
       metadata TEXT
     );
+  `);
 
+  const columns = db.prepare('PRAGMA table_info(activities)').all() as Array<{ name: string }>;
+  const columnNames = new Set(columns.map((column) => column.name));
+
+  if (!columnNames.has('agent')) {
+    db.exec('ALTER TABLE activities ADD COLUMN agent TEXT');
+  }
+
+  if (!columnNames.has('metadata')) {
+    db.exec('ALTER TABLE activities ADD COLUMN metadata TEXT');
+  }
+
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_activities_timestamp ON activities(timestamp DESC);
     CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(type);
     CREATE INDEX IF NOT EXISTS idx_activities_status ON activities(status);
+    CREATE INDEX IF NOT EXISTS idx_activities_agent ON activities(agent);
   `);
+}
+
+function getDefaultAgent(env: NodeJS.ProcessEnv = process.env): string | null {
+  if (typeof env.ACTIVITY_AGENT === 'string' && env.ACTIVITY_AGENT.trim()) {
+    return env.ACTIVITY_AGENT.trim();
+  }
+
+  const [openclawDir] = getOpenclawDirs(env);
+  if (!openclawDir) {
+    return null;
+  }
+
+  try {
+    const config = JSON.parse(fs.readFileSync(path.join(openclawDir, 'openclaw.json'), 'utf-8')) as {
+      agents?: { list?: Array<{ id?: string; default?: boolean }> };
+    };
+    const agents = config.agents?.list || [];
+    return agents.find((agent) => agent.default)?.id || agents[0]?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+function getDb(): Database.Database {
+  const dbPath = getActivitiesDbPath();
+  if (_db && _dbPath === dbPath) return _db;
+  if (_db && _dbPath !== dbPath) {
+    _db.close();
+    _db = null;
+  }
+
+  // Ensure data dir
+  const dataDir = path.dirname(dbPath);
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  _db = new Database(dbPath);
+  _dbPath = dbPath;
+
+  // WAL mode for better concurrency
+  _db.pragma('journal_mode = WAL');
+  _db.pragma('synchronous = NORMAL');
+
+  ensureSchema(_db);
 
   // Migrate from JSON if DB is empty and JSON exists
   const count = (_db.prepare('SELECT COUNT(*) as n FROM activities').get() as { n: number }).n;
   if (count === 0) {
-    const jsonPath = path.join(process.cwd(), 'data', 'activities.json');
+    const jsonPath = path.join(path.dirname(dbPath), 'activities.json');
     if (fs.existsSync(jsonPath)) {
       try {
         const data = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
@@ -134,7 +192,7 @@ export function logActivity(
     status,
     opts?.duration_ms ?? null,
     opts?.tokens_used ?? null,
-    opts?.agent ?? null,
+    opts?.agent ?? getDefaultAgent(),
     opts?.metadata ? JSON.stringify(opts.metadata) : null,
   );
 
@@ -142,7 +200,17 @@ export function logActivity(
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   db.prepare('DELETE FROM activities WHERE timestamp < ?').run(cutoff);
 
-  return { id, timestamp, type, description, status, duration_ms: opts?.duration_ms ?? null, tokens_used: opts?.tokens_used ?? null, agent: opts?.agent ?? null, metadata: opts?.metadata ?? null };
+  return {
+    id,
+    timestamp,
+    type,
+    description,
+    status,
+    duration_ms: opts?.duration_ms ?? null,
+    tokens_used: opts?.tokens_used ?? null,
+    agent: opts?.agent ?? getDefaultAgent(),
+    metadata: opts?.metadata ?? null,
+  };
 }
 
 export function updateActivity(
@@ -271,4 +339,12 @@ export function getActivityStats(): {
   for (const r of statusRows) byStatus[r.status] = r.n;
 
   return { total, today, byType, byStatus };
+}
+
+export function resetActivitiesDbForTests(): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+  _dbPath = null;
 }

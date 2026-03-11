@@ -1,29 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
 import { execSync } from "child_process";
-
-function getGatewayConfig() {
-  try {
-    const configRaw = require("fs").readFileSync((process.env.OPENCLAW_DIR || "/root/.openclaw") + "/openclaw.json", "utf-8");
-    const config = JSON.parse(configRaw);
-    return {
-      token: config.gateway?.auth?.token || "",
-      port: config.gateway?.port || 18789,
-    };
-  } catch {
-    return { token: "", port: 18789 };
-  }
-}
+import { NextRequest, NextResponse } from "next/server";
+import { listCronJobsAcrossAgents } from "@/lib/cron-jobs";
 
 // GET: List all cron jobs from the OpenClaw gateway
 export async function GET() {
   try {
-    const output = execSync("openclaw cron list --json --all 2>/dev/null", {
-      timeout: 10000,
-      encoding: "utf-8",
-    });
-
-    const data = JSON.parse(output);
-    const jobs = (data.jobs || []).map((job: Record<string, unknown>) => ({
+    const jobs = listCronJobsAcrossAgents().map((job: Record<string, unknown>) => ({
       id: job.id,
       agentId: job.agentId || "main",
       name: job.name || "Unnamed",
@@ -100,7 +82,7 @@ export async function PUT(request: NextRequest) {
 
     const action = enabled ? "enable" : "disable";
     // Use openclaw CLI to update the job
-    const output = execSync(
+    execSync(
       `openclaw cron ${action} ${id} --json 2>/dev/null || openclaw cron update ${id} --enabled=${enabled} --json 2>/dev/null`,
       { timeout: 10000, encoding: "utf-8" }
     );

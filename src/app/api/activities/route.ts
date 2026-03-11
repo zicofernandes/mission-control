@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const agent = typeof body.agent === 'string' && body.agent.trim() ? body.agent.trim() : null;
 
     if (!body.type || !body.description || !body.status) {
       return NextResponse.json(
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     const activity = logActivity(body.type, body.description, body.status, {
       duration_ms: body.duration_ms ?? null,
       tokens_used: body.tokens_used ?? null,
-      agent: body.agent ?? null,
+      agent,
       metadata: body.metadata ?? null,
     });
 
