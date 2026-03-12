@@ -57,7 +57,7 @@ export function getDefaultWorkspaceSkillPaths(env: NodeJS.ProcessEnv = process.e
     .split(',')
     .map((dir) => dir.trim())
     .filter(Boolean)
-    .map((dir) => path.join(dir, 'workspace-infra', 'skills'));
+    .map((dir) => path.join(dir, 'workspace', 'skills'));
 }
 
 /**
@@ -200,8 +200,8 @@ export function buildAgentSkillMap(): Map<string, string[]> {
     .filter(Boolean);
 
   for (const openclawDir of openclawDirs) {
-    // Agent workspaces: workspace, workspace-infra, workspace-social, etc.
-    // Read from openclaw.json if possible
+    // Agent workspaces: read skills from <openclaw-dir>/workspace/skills
+    // Lookup from openclaw.json if possible
     let agentList: Array<{ id: string; workspace: string }> = [];
     try {
       const openclawConfig: OpenClawConfig = JSON.parse(
