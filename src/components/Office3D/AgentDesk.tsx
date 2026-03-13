@@ -30,15 +30,15 @@ export default function AgentDesk({ agent, state: stateProp, onClick, isSelected
   const stateRef = useRef<AgentState>(state);
   stateRef.current = state;
 
-  // Animación de pulsación para estado "thinking"
+  // Pulse animation for "thinking" state
   useFrame((frameState) => {
-    if (monitorRef.current && stateRef.current.status === 'thinking') {
+    if (monitorRef.current && stateRef.current?.status === 'thinking') {
       monitorRef.current.scale.setScalar(1 + Math.sin(frameState.clock.elapsedTime * 2) * 0.05);
     }
   });
 
   const getStatusColor = () => {
-    switch (stateRef.current.status) {
+    switch (stateRef.current?.status) {
       case 'working':
         return '#22c55e'; // green-500
       case 'thinking':
@@ -52,7 +52,7 @@ export default function AgentDesk({ agent, state: stateProp, onClick, isSelected
   };
 
   const getMonitorEmissive = () => {
-    switch (stateRef.current.status) {
+    switch (stateRef.current?.status) {
       case 'working':
         return '#15803d'; // darker green
       case 'thinking':
@@ -97,6 +97,7 @@ export default function AgentDesk({ agent, state: stateProp, onClick, isSelected
           color={getStatusColor()}
           emissive={getMonitorEmissive()}
           emissiveIntensity={state.status === 'idle' ? 0.1 : 0.5}
+
         />
       </Box>
 
@@ -152,7 +153,7 @@ export default function AgentDesk({ agent, state: stateProp, onClick, isSelected
         anchorX="center"
         anchorY="middle"
       >
-        {state.status.toUpperCase()}
+        {(state.status ?? 'idle').toUpperCase()}
         {state.model ? ` • ${state.model}` : ''}
       </Text>
 

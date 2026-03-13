@@ -41,32 +41,34 @@ interface LiveAgent {
   activeSessions: number;
 }
 
-function mapToAgentConfig(agent: LiveAgent, index: number): AgentConfig {
-  return {
-    id: agent.id,
-    name: agent.name,
-    emoji: agent.emoji,
-    position: DESK_POSITIONS[index] ?? DESK_POSITIONS[0],
-    color: agent.color || DESK_COLORS[index] || '#FFCC00',
-    role: index === 0 ? 'Main Agent' : 'Sub-agent',
-  };
+// Merged config+state — always updated atomically so AgentDesk never gets a config without a state
+interface AgentEntry {
+  config: AgentConfig;
+  state: AgentState;
 }
 
-function mapToAgentState(agent: LiveAgent): AgentState {
+function mapToEntry(agent: LiveAgent, index: number): AgentEntry {
   return {
-    id: agent.id,
-    status: agent.status === 'online' ? 'working' : 'idle',
-    model: agent.model,
-    activeSessions: agent.activeSessions,
-    lastActivity: agent.lastActivity,
+    config: {
+      id: agent.id,
+      name: agent.name,
+      emoji: agent.emoji,
+      position: DESK_POSITIONS[index] ?? DESK_POSITIONS[0],
+      color: agent.color || DESK_COLORS[index] || '#FFCC00',
+      role: index === 0 ? 'Main Agent' : 'Sub-agent',
+    },
+    state: {
+      id: agent.id,
+      status: agent.status === 'online' ? 'working' : 'idle',
+      model: agent.model,
+      activeSessions: agent.activeSessions,
+      lastActivity: agent.lastActivity,
+    },
   };
 }
-
-const DEFAULT_STATE: AgentState = { id: '', status: 'idle' };
 
 export default function Office3D() {
-  const [agents, setAgents] = useState<AgentConfig[]>([]);
-  const [agentStates, setAgentStates] = useState<Record<string, AgentState>>({});
+  const [agentEntries, setAgentEntries] = useState<AgentEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [interactionModal, setInteractionModal] = useState<string | null>(null);
@@ -79,10 +81,7 @@ export default function Office3D() {
         const res = await fetch('/api/agents');
         const data = await res.json();
         const liveAgents: LiveAgent[] = data.agents || [];
-        setAgents(liveAgents.map(mapToAgentConfig));
-        const states: Record<string, AgentState> = {};
-        liveAgents.forEach(a => { states[a.id] = mapToAgentState(a); });
-        setAgentStates(states);
+        setAgentEntries(liveAgents.map(mapToEntry));
       } catch (e) {
         console.error('Failed to load agents:', e);
       } finally {
@@ -107,8 +106,8 @@ export default function Office3D() {
 
   // Define obstacles (furniture + agent desks)
   const obstacles = [
-    ...agents.map(agent => ({
-      position: new Vector3(agent.position[0], 0, agent.position[2]),
+    ...agentEntries.map(({ config }) => ({
+      position: new Vector3(config.position[0], 0, config.position[2]),
       radius: 1.5
     })),
     { position: new Vector3(-8, 0, -5), radius: 0.8 },  // File cabinet
@@ -147,23 +146,23 @@ export default function Office3D() {
           {/* Walls */}
           <Walls />
 
-          {/* Agent desks — rendered only for real configured agents */}
-          {agents.map((agent) => (
+          {/* Agent desks — config and state always in sync (single atomic state) */}
+          {agentEntries.map(({ config, state }) => (
             <AgentDesk
-              key={agent.id}
-              agent={agent}
-              state={agentStates[agent.id] ?? { ...DEFAULT_STATE, id: agent.id }}
-              onClick={() => handleDeskClick(agent.id)}
-              isSelected={selectedAgent === agent.id}
+              key={config.id}
+              agent={config}
+              state={state}
+              onClick={() => handleDeskClick(config.id)}
+              isSelected={selectedAgent === config.id}
             />
           ))}
 
           {/* Moving avatars */}
-          {agents.map((agent) => (
+          {agentEntries.map(({ config, state }) => (
             <MovingAvatar
-              key={`avatar-${agent.id}`}
-              agent={agent}
-              state={agentStates[agent.id] ?? { ...DEFAULT_STATE, id: agent.id }}
+              key={`avatar-${config.id}`}
+              agent={config}
+              state={state}
               officeBounds={{ minX: -8, maxX: 8, minZ: -7, maxZ: 7 }}
               obstacles={obstacles}
               otherAvatarPositions={avatarPositions}
@@ -199,10 +198,10 @@ export default function Office3D() {
       </Canvas>
 
       {/* Side panel when an agent is selected */}
-      {selectedAgent && (
+      {selectedAgent && agentEntries.find(e => e.config.id === selectedAgent) && (
         <AgentPanel
-          agent={agents.find(a => a.id === selectedAgent)!}
-          state={agentStates[selectedAgent] ?? { ...DEFAULT_STATE, id: selectedAgent }}
+          agent={agentEntries.find(e => e.config.id === selectedAgent)!.config}
+          state={agentEntries.find(e => e.config.id === selectedAgent)!.state}
           onClose={handleClosePanel}
         />
       )}
@@ -250,9 +249,9 @@ export default function Office3D() {
                 <>
                   <p className="text-lg">⚡ Agent activity and energy levels</p>
                   <div className="bg-gray-800 p-4 rounded border border-gray-700 space-y-3">
-                    {Object.values(agentStates).map(s => (
-                      <div key={s.id} className="flex items-center justify-between">
-                        <span className="text-sm">{agents.find(a => a.id === s.id)?.emoji} {agents.find(a => a.id === s.id)?.name}</span>
+                    {agentEntries.map(({ config, state: s }) => (
+                      <div key={config.id} className="flex items-center justify-between">
+                        <span className="text-sm">{config.emoji} {config.name}</span>
                         <span className={`text-sm font-bold ${s.status === 'working' ? 'text-green-400' : s.status === 'thinking' ? 'text-blue-400' : s.status === 'error' ? 'text-red-400' : 'text-gray-400'}`}>
                           {s.status.toUpperCase()}
                         </span>
@@ -276,7 +275,7 @@ export default function Office3D() {
         {loading ? (
           <p className="text-xs text-gray-400 mb-3">Loading agents...</p>
         ) : (
-          <p className="text-xs text-gray-400 mb-3">{agents.length} agent{agents.length !== 1 ? 's' : ''} online</p>
+          <p className="text-xs text-gray-400 mb-3">{agentEntries.length} agent{agentEntries.length !== 1 ? 's' : ''} online</p>
         )}
         <div className="text-sm space-y-1 mb-3">
           <p><strong>Mode: {controlMode === 'orbit' ? '🖱️ Orbit' : '🎮 FPS'}</strong></p>
@@ -314,18 +313,15 @@ export default function Office3D() {
         </div>
 
         {/* Live agent status */}
-        {agents.length > 0 && (
+        {agentEntries.length > 0 && (
           <div className="mt-3 pt-3 border-t border-white/20 space-y-1">
-            {agents.map(agent => {
-              const state = agentStates[agent.id];
-              return (
-                <div key={agent.id} className="flex items-center gap-2">
-                  <span className="text-sm">{agent.emoji}</span>
-                  <span className="text-xs">{agent.name}</span>
-                  <div className={`w-2 h-2 rounded-full ml-auto ${state?.status === 'working' ? 'bg-green-500' : state?.status === 'thinking' ? 'bg-blue-500 animate-pulse' : state?.status === 'error' ? 'bg-red-500' : 'bg-gray-500'}`} />
+            {agentEntries.map(({ config, state }) => (
+                <div key={config.id} className="flex items-center gap-2">
+                  <span className="text-sm">{config.emoji}</span>
+                  <span className="text-xs">{config.name}</span>
+                  <div className={`w-2 h-2 rounded-full ml-auto ${state.status === 'working' ? 'bg-green-500' : state.status === 'thinking' ? 'bg-blue-500 animate-pulse' : state.status === 'error' ? 'bg-red-500' : 'bg-gray-500'}`} />
                 </div>
-              );
-            })}
+              ))}
           </div>
         )}
       </div>
