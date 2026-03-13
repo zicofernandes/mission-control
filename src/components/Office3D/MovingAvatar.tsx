@@ -27,12 +27,15 @@ interface MovingAvatarProps {
 
 export default function MovingAvatar({ 
   agent, 
-  state, 
+  state: stateProp, 
   officeBounds, 
   obstacles, 
   otherAvatarPositions,
   onPositionUpdate 
 }: MovingAvatarProps) {
+  // Guard: ensure state is never undefined even if parent passes an unknown agent id
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  const state: AgentState = (stateProp as AgentState | undefined) ?? { id: agent.id, status: 'idle' };
   const groupRef = useRef<Group>(null);
   
   // Posición inicial completamente aleatoria SIN colisiones

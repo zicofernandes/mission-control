@@ -5,32 +5,40 @@ import { useFrame } from '@react-three/fiber';
 import { Text, Box } from '@react-three/drei';
 import type { Mesh } from 'three';
 import type { AgentConfig, AgentState } from './agentsConfig';
-import VoxelAvatar from './VoxelAvatar';
 import VoxelChair from './VoxelChair';
 import VoxelKeyboard from './VoxelKeyboard';
 import VoxelMacMini from './VoxelMacMini';
 
 interface AgentDeskProps {
   agent: AgentConfig;
-  state: AgentState;
+  state?: AgentState; // optional — component self-heals when state is missing
   onClick: () => void;
   isSelected: boolean;
 }
 
-export default function AgentDesk({ agent, state, onClick, isSelected }: AgentDeskProps) {
+const IDLE_STATE: AgentState = { id: '', status: 'idle' };
+
+export default function AgentDesk({ agent, state: stateProp, onClick, isSelected }: AgentDeskProps) {
+  // Always resolve to a valid state object — never let undefined reach inner logic
+  const state: AgentState = stateProp ?? { ...IDLE_STATE, id: agent.id };
+
   const deskRef = useRef<Mesh>(null);
   const monitorRef = useRef<Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
+  // Keep a stable ref so useFrame never reads a stale/undefined closure value
+  const stateRef = useRef<AgentState>(state);
+  stateRef.current = state;
+
   // Animación de pulsación para estado "thinking"
   useFrame((frameState) => {
-    if (monitorRef.current && state.status === 'thinking') {
+    if (monitorRef.current && stateRef.current.status === 'thinking') {
       monitorRef.current.scale.setScalar(1 + Math.sin(frameState.clock.elapsedTime * 2) * 0.05);
     }
   });
 
   const getStatusColor = () => {
-    switch (state.status) {
+    switch (stateRef.current.status) {
       case 'working':
         return '#22c55e'; // green-500
       case 'thinking':
@@ -44,7 +52,7 @@ export default function AgentDesk({ agent, state, onClick, isSelected }: AgentDe
   };
 
   const getMonitorEmissive = () => {
-    switch (state.status) {
+    switch (stateRef.current.status) {
       case 'working':
         return '#15803d'; // darker green
       case 'thinking':
@@ -145,7 +153,7 @@ export default function AgentDesk({ agent, state, onClick, isSelected }: AgentDe
         anchorY="middle"
       >
         {state.status.toUpperCase()}
-        {state.model && ` • ${state.model}`}
+        {state.model ? ` • ${state.model}` : ''}
       </Text>
 
       {/* Desk legs */}
