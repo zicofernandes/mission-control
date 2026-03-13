@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 export interface Workspace {
   id: string;
@@ -7,6 +8,7 @@ export interface Workspace {
   emoji: string;
   path: string;
   agentName?: string;
+  kind: "workspace" | "vault" | "system";
 }
 
 export function getOpenclawDirs(env: NodeJS.ProcessEnv = process.env): string[] {
@@ -18,7 +20,7 @@ function getWorkspaceId(openclawDir: string, workspaceDirName: string): string {
   return `${openclawDir}::${workspaceDirName}`;
 }
 
-function getAgentInfo(workspacePath: string): { name: string; emoji: string } | null {
+function getAgentInfo(workspacePath: string): { name: string; emoji: string; role: string } | null {
   const identityPath = path.join(workspacePath, "IDENTITY.md");
 
   if (!fs.existsSync(identityPath)) {
@@ -27,8 +29,9 @@ function getAgentInfo(workspacePath: string): { name: string; emoji: string } | 
 
   try {
     const content = fs.readFileSync(identityPath, "utf-8");
-    const nameMatch = content.match(/- \*\*Name:\*\* (.+)/);
-    const emojiMatch = content.match(/- \*\*Emoji:\*\* (.+)/);
+    const nameMatch = content.match(/- \*\*Name:\*\*\s*(.+)/);
+    const emojiMatch = content.match(/- \*\*Emoji:\*\*\s*(.+)/);
+    const roleMatch = content.match(/- \*\*Role:\*\*\s*(.+)/);
 
     let emoji = "📁";
     if (emojiMatch) {
@@ -38,6 +41,7 @@ function getAgentInfo(workspacePath: string): { name: string; emoji: string } | 
     return {
       name: nameMatch ? nameMatch[1].trim() : "",
       emoji,
+      role: roleMatch ? roleMatch[1].trim() : "",
     };
   } catch {
     return null;
@@ -47,16 +51,19 @@ function getAgentInfo(workspacePath: string): { name: string; emoji: string } | 
 export function listWorkspaces(env: NodeJS.ProcessEnv = process.env): Workspace[] {
   const workspaces: Workspace[] = [];
 
+  // Iterate in OPENCLAW_DIRS order — first dir's agents rank highest
   for (const openclawDir of getOpenclawDirs(env)) {
     const mainWorkspace = path.join(openclawDir, "workspace");
     if (fs.existsSync(mainWorkspace)) {
       const mainInfo = getAgentInfo(mainWorkspace);
+      const agentName = mainInfo?.name || path.basename(openclawDir).replace(/^\.openclaw-?/, "") || "Agent";
       workspaces.push({
         id: getWorkspaceId(openclawDir, "workspace"),
-        name: "Workspace Principal",
-        emoji: mainInfo?.emoji || "🦞",
+        name: agentName || "Main Workspace",
+        emoji: mainInfo?.emoji || "🤖",
         path: mainWorkspace,
-        agentName: mainInfo?.name || "Tenacitas",
+        agentName: agentName,
+        kind: "workspace",
       });
     }
 
@@ -75,33 +82,70 @@ export function listWorkspaces(env: NodeJS.ProcessEnv = process.env): Workspace[
       const workspacePath = path.join(openclawDir, entry.name);
       const agentInfo = getAgentInfo(workspacePath);
       const agentId = entry.name.replace("workspace-", "");
-      const workspaceLabel = agentId.charAt(0).toUpperCase() + agentId.slice(1);
+      const agentName = agentInfo?.name || agentId.charAt(0).toUpperCase() + agentId.slice(1);
 
       workspaces.push({
         id: getWorkspaceId(openclawDir, entry.name),
-        name: workspaceLabel,
+        name: agentName,
         emoji: agentInfo?.emoji || "🤖",
         path: workspacePath,
         agentName: agentInfo?.name || undefined,
+        kind: "workspace",
       });
     }
   }
 
-  workspaces.sort((a, b) => {
-    const aIsMain = path.basename(a.path) === "workspace";
-    const bIsMain = path.basename(b.path) === "workspace";
-
-    if (aIsMain !== bIsMain) {
-      return aIsMain ? -1 : 1;
-    }
-
-    return a.name.localeCompare(b.name) || a.path.localeCompare(b.path);
-  });
-
   return workspaces;
 }
 
+export function listVaults(env: NodeJS.ProcessEnv = process.env): Workspace[] {
+  const vaults: Workspace[] = [];
+  const vaultPath = env.VAULT_PATH || path.join(os.homedir(), "zico-vault");
+  if (fs.existsSync(vaultPath)) {
+    vaults.push({
+      id: `vault::${vaultPath}`,
+      name: "zico-vault",
+      emoji: "📚",
+      path: vaultPath,
+      kind: "vault",
+    });
+  }
+  return vaults;
+}
+
+export function listSystemRoots(env: NodeJS.ProcessEnv = process.env): Workspace[] {
+  const roots: Workspace[] = [];
+  for (const openclawDir of getOpenclawDirs(env)) {
+    if (!fs.existsSync(openclawDir)) continue;
+    // Get agent name from workspace/IDENTITY.md for the label
+    const workspacePath = path.join(openclawDir, "workspace");
+    const info = fs.existsSync(workspacePath) ? getAgentInfo(workspacePath) : null;
+    const label = info?.name || path.basename(openclawDir).replace(/^\.openclaw-?/, "") || "System";
+    roots.push({
+      id: `system::${openclawDir}`,
+      name: label,
+      emoji: info?.emoji || "⚙️",
+      path: openclawDir,
+      agentName: info?.name,
+      kind: "system",
+    });
+  }
+  return roots;
+}
+
 export function resolveWorkspacePath(workspaceId: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  // Vault roots: vault::/absolute/path
+  if (workspaceId.startsWith("vault::")) {
+    const p = workspaceId.slice("vault::".length);
+    return fs.existsSync(p) ? p : null;
+  }
+
+  // System roots: system::/absolute/path
+  if (workspaceId.startsWith("system::")) {
+    const p = workspaceId.slice("system::".length);
+    return fs.existsSync(p) ? p : null;
+  }
+
   if (workspaceId === "mission-control") {
     const [firstDir] = getOpenclawDirs(env);
     return firstDir ? path.join(firstDir, "workspace", "mission-control") : null;

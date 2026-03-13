@@ -98,9 +98,9 @@ export async function GET() {
           const memoryFile = join(memoryPath, `${today}.md`);
           const stat = require("fs").statSync(memoryFile);
           lastActivity = stat.mtime.toISOString();
-          // Consider online if activity within last 5 minutes
+          // Consider online if activity within last hour
           status =
-            Date.now() - stat.mtime.getTime() < 5 * 60 * 1000
+            Date.now() - stat.mtime.getTime() < 60 * 60 * 1000
               ? "online"
               : "offline";
         } catch (e) {

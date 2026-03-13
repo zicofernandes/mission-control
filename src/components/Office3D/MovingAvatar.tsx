@@ -166,7 +166,7 @@ export default function MovingAvatar({
       // Notificar la nueva posición
       onPositionUpdate(agent.id, currentPos.current.clone());
 
-      // Rotar hacia la dirección del movimiento
+      // Rotate towards movement direction
       const direction = new Vector3().subVectors(targetPos, currentPos.current);
       if (direction.length() > 0.1) {
         const angle = Math.atan2(direction.x, direction.z);

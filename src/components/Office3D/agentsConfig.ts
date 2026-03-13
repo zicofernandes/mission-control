@@ -84,4 +84,6 @@ export interface AgentState {
   tokensPerHour?: number;
   tasksInQueue?: number;
   uptime?: number; // days
+  activeSessions?: number;
+  lastActivity?: string;
 }

@@ -15,7 +15,7 @@ export default function VoxelKeyboard({ position, rotation = [0, 0, 0] }: VoxelK
         <meshStandardMaterial color="#2d3748" roughness={0.8} />
       </Box>
 
-      {/* Fila de teclas - superior (números) */}
+      {/* Key row - top (numbers) */}
       {Array.from({ length: 10 }).map((_, i) => (
         <Box
           key={`top-${i}`}
@@ -27,7 +27,7 @@ export default function VoxelKeyboard({ position, rotation = [0, 0, 0] }: VoxelK
         </Box>
       ))}
 
-      {/* Fila de teclas - media (QWERTY) */}
+      {/* Key row - middle (QWERTY) */}
       {Array.from({ length: 9 }).map((_, i) => (
         <Box
           key={`mid-${i}`}
@@ -39,7 +39,7 @@ export default function VoxelKeyboard({ position, rotation = [0, 0, 0] }: VoxelK
         </Box>
       ))}
 
-      {/* Fila de teclas - inferior (ASDF) */}
+      {/* Key row - bottom (ASDF) */}
       {Array.from({ length: 8 }).map((_, i) => (
         <Box
           key={`low-${i}`}

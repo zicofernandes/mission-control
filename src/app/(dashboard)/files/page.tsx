@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { List, Grid3X3 } from "lucide-react";
+import { List, Grid3X3, Layers, BookOpen, Settings } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FileBrowser } from "@/components/FileBrowser";
 
@@ -11,37 +11,67 @@ interface Workspace {
   emoji: string;
   path: string;
   agentName?: string;
+  kind: "workspace" | "vault" | "system";
 }
 
+type TabId = "workspaces" | "vault" | "system";
+
+const TABS: { id: TabId; label: string; icon: typeof Layers }[] = [
+  { id: "workspaces", label: "Workspaces", icon: Layers },
+  { id: "vault",      label: "Vault",       icon: BookOpen },
+  { id: "system",     label: "System",      icon: Settings },
+];
+
 export default function FilesPage() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("workspaces");
+  const [allRoots, setAllRoots] = useState<{ workspaces: Workspace[]; vaults: Workspace[]; system: Workspace[] }>({
+    workspaces: [],
+    vaults: [],
+    system: [],
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   useEffect(() => {
-    fetch("/api/files/workspaces")
-      .then((res) => res.json())
+    fetch("/api/files/roots")
+      .then((r) => r.json())
       .then((data) => {
-        setWorkspaces(data.workspaces || []);
-        if (data.workspaces.length > 0) {
-          setSelectedWorkspace(data.workspaces[0].id);
-        }
+        setAllRoots(data);
+        // Auto-select first workspace
+        if (data.workspaces?.length > 0) setSelectedId(data.workspaces[0].id);
       })
-      .catch(() => setWorkspaces([]));
+      .catch(() => {});
   }, []);
 
-  const handleWorkspaceSelect = (workspaceId: string) => {
-    setSelectedWorkspace(workspaceId);
+  // Items visible in the current tab's sidebar
+  const sidebarItems: Workspace[] = {
+    workspaces: allRoots.workspaces,
+    vault:      allRoots.vaults,
+    system:     allRoots.system,
+  }[activeTab];
+
+  const selectedItem = [...allRoots.workspaces, ...allRoots.vaults, ...allRoots.system].find(
+    (w) => w.id === selectedId
+  );
+
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    setCurrentPath("");
+    // Auto-select first item in tab
+    const items = tab === "workspaces" ? allRoots.workspaces : tab === "vault" ? allRoots.vaults : allRoots.system;
+    setSelectedId(items[0]?.id ?? null);
+  };
+
+  const handleSidebarSelect = (id: string) => {
+    setSelectedId(id);
     setCurrentPath("");
   };
 
-  const selectedWorkspaceData = workspaces.find((w) => w.id === selectedWorkspace);
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: "0" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 0 }}>
       {/* Page header */}
-      <div style={{ padding: "24px 24px 16px 24px" }}>
+      <div style={{ padding: "24px 24px 0 24px" }}>
         <h1
           style={{
             fontFamily: "var(--font-heading)",
@@ -54,21 +84,59 @@ export default function FilesPage() {
         >
           File Browser
         </h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "var(--text-secondary)" }}>
-          Navega por los workspaces y archivos de los agentes
+        <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "var(--text-secondary)", marginBottom: "16px" }}>
+          Browse agent workspaces, vault notes, and system files
         </p>
+
+        {/* Tab bar */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--border)" }}>
+          {TABS.map(({ id, label, icon: Icon }) => {
+            const active = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => handleTabChange(id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 16px",
+                  fontSize: "13px",
+                  fontWeight: active ? 600 : 400,
+                  color: active ? "var(--accent)" : "var(--text-secondary)",
+                  background: "none",
+                  border: "none",
+                  borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+                  marginBottom: "-1px",
+                  cursor: "pointer",
+                  transition: "all 120ms ease",
+                }}
+              >
+                <Icon size={14} />
+                {label}
+                {id !== "workspaces" && (
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      padding: "1px 5px",
+                      borderRadius: "9999px",
+                      background: "var(--accent-soft, rgba(139,92,246,0.15))",
+                      color: "var(--accent)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {id === "vault" ? allRoots.vaults.length : allRoots.system.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Two-column layout */}
-      <div
-        style={{
-          display: "flex",
-          flex: 1,
-          overflow: "hidden",
-          borderTop: "1px solid var(--border)",
-        }}
-      >
-        {/* ── LEFT SIDEBAR: Workspace list ─────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", borderTop: "1px solid var(--border)" }}>
+        {/* Sidebar */}
         <aside
           style={{
             width: "220px",
@@ -89,15 +157,21 @@ export default function FilesPage() {
               textTransform: "uppercase",
             }}
           >
-            Workspaces
+            {activeTab === "workspaces" ? "Agent Workspaces" : activeTab === "vault" ? "Vault" : "System Roots"}
           </p>
 
-          {workspaces.map((workspace) => {
-            const isSelected = selectedWorkspace === workspace.id;
+          {sidebarItems.length === 0 && (
+            <p style={{ padding: "8px 16px", fontSize: "12px", color: "var(--text-muted)" }}>
+              Nothing found
+            </p>
+          )}
+
+          {sidebarItems.map((item) => {
+            const isSelected = selectedId === item.id;
             return (
               <button
-                key={workspace.id}
-                onClick={() => handleWorkspaceSelect(workspace.id)}
+                key={item.id}
+                onClick={() => handleSidebarSelect(item.id)}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -111,14 +185,8 @@ export default function FilesPage() {
                   textAlign: "left",
                   transition: "all 120ms ease",
                 }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = "var(--surface-hover, rgba(255,255,255,0.05))";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = "transparent";
-                }}
               >
-                <span style={{ fontSize: "18px", lineHeight: 1, flexShrink: 0 }}>{workspace.emoji}</span>
+                <span style={{ fontSize: "18px", lineHeight: 1, flexShrink: 0 }}>{item.emoji}</span>
                 <div style={{ minWidth: 0 }}>
                   <div
                     style={{
@@ -131,19 +199,16 @@ export default function FilesPage() {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {workspace.name}
+                    {item.name}
                   </div>
-                  {workspace.agentName && (
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--text-muted)",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {workspace.agentName}
+                  {item.agentName && item.agentName !== item.name && (
+                    <div style={{ fontSize: "11px", color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.agentName}
+                    </div>
+                  )}
+                  {activeTab === "system" && (
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.path.replace(process.env.HOME || "", "~")}
                     </div>
                   )}
                 </div>
@@ -152,11 +217,11 @@ export default function FilesPage() {
           })}
         </aside>
 
-        {/* ── RIGHT PANEL: File explorer ────────────────────────────────────── */}
+        {/* Main panel */}
         <main style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-          {selectedWorkspace && selectedWorkspaceData ? (
+          {selectedId && selectedItem ? (
             <>
-              {/* Breadcrumb bar + view toggle */}
+              {/* Breadcrumb + view toggle */}
               <div
                 style={{
                   display: "flex",
@@ -173,55 +238,38 @@ export default function FilesPage() {
                   <Breadcrumbs
                     path={currentPath}
                     onNavigate={setCurrentPath}
-                    prefix={selectedWorkspaceData.name}
+                    prefix={selectedItem.name}
                   />
                 </div>
-
-                {/* View mode toggle */}
                 <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    title="Vista lista"
-                    style={{
-                      padding: "5px 7px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: viewMode === "list" ? "var(--accent)" : "transparent",
-                      color: viewMode === "list" ? "var(--bg, #111)" : "var(--text-muted)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 120ms ease",
-                    }}
-                  >
-                    <List size={15} />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    title="Vista iconos"
-                    style={{
-                      padding: "5px 7px",
-                      borderRadius: "6px",
-                      border: "none",
-                      cursor: "pointer",
-                      backgroundColor: viewMode === "grid" ? "var(--accent)" : "transparent",
-                      color: viewMode === "grid" ? "var(--bg, #111)" : "var(--text-muted)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 120ms ease",
-                    }}
-                  >
-                    <Grid3X3 size={15} />
-                  </button>
+                  {(["list", "grid"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setViewMode(mode)}
+                      title={mode === "list" ? "List view" : "Grid view"}
+                      style={{
+                        padding: "5px 7px",
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        backgroundColor: viewMode === mode ? "var(--accent)" : "transparent",
+                        color: viewMode === mode ? "var(--bg, #111)" : "var(--text-muted)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 120ms ease",
+                      }}
+                    >
+                      {mode === "list" ? <List size={15} /> : <Grid3X3 size={15} />}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* File list */}
-              <div style={{ flex: 1, padding: "0" }}>
+              {/* File browser */}
+              <div style={{ flex: 1, padding: 0 }}>
                 <FileBrowser
-                  workspace={selectedWorkspace}
+                  workspace={selectedId}
                   path={currentPath}
                   onNavigate={setCurrentPath}
                   viewMode={viewMode}
@@ -229,17 +277,8 @@ export default function FilesPage() {
               </div>
             </>
           ) : (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-muted)",
-                fontSize: "14px",
-              }}
-            >
-              Selecciona un workspace para explorar sus archivos
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "14px" }}>
+              Select an item to browse its files
             </div>
           )}
         </main>
