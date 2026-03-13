@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import { join } from "path";
+import * as net from "net";
+
+/** Returns true if a TCP connection to host:port succeeds within timeoutMs */
+function tcpProbe(host: string, port: number, timeoutMs = 1500): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const done = (result: boolean) => {
+      if (!settled) { settled = true; socket.destroy(); resolve(result); }
+    };
+    socket.setTimeout(timeoutMs);
+    socket.on("connect", () => done(true));
+    socket.on("error", () => done(false));
+    socket.on("timeout", () => done(false));
+    socket.connect(port, host);
+  });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -57,8 +74,6 @@ function getAgentDisplayInfo(agentId: string, agentConfig: any): { emoji: string
 
 export async function GET() {
   try {
-    // Support multiple openclaw directories via OPENCLAW_DIRS (comma-separated)
-    // Fallback to single OPENCLAW_DIR for backwards compatibility
     const dirsEnv = process.env.OPENCLAW_DIRS || process.env.OPENCLAW_DIR || "/root/.openclaw";
     const openclawDirs = dirsEnv.split(",").map((d) => d.trim()).filter(Boolean);
 
@@ -76,8 +91,13 @@ export async function GET() {
 
       const defaultWorkspace = config.agents?.defaults?.workspace || openclawDir + "/workspace";
 
+      // Gateway port for this dir — use TCP probe for reliable online detection
+      const gatewayPort: number | null = config.server?.port || null;
+      const gatewayOnline = gatewayPort ? await tcpProbe("127.0.0.1", gatewayPort) : false;
+
       // Get agents from config
       const dirAgents: Agent[] = (config.agents?.list || []).map((agent: any) => {
+        // Note: gatewayOnline is resolved above per-dir (not per-agent) — all agents in this dir share the same gateway
         const agentInfo = getAgentDisplayInfo(agent.id, agent);
 
         // Get telegram account info
@@ -88,23 +108,17 @@ export async function GET() {
         // Resolve workspace — agent-level takes priority, then defaults, then fallback
         const resolvedWorkspace = agent.workspace || defaultWorkspace;
 
-        // Check if agent has recent activity
-        const memoryPath = join(resolvedWorkspace, "memory");
-        let lastActivity = undefined;
-        let status: "online" | "offline" = "offline";
-
+        // Online = gateway TCP port is responding (authoritative)
+        // lastActivity = most recent memory file mtime (informational only)
+        const status: "online" | "offline" = gatewayOnline ? "online" : "offline";
+        let lastActivity: string | undefined;
         try {
           const today = new Date().toISOString().split("T")[0];
-          const memoryFile = join(memoryPath, `${today}.md`);
+          const memoryFile = join(resolvedWorkspace, "memory", `${today}.md`);
           const stat = require("fs").statSync(memoryFile);
           lastActivity = stat.mtime.toISOString();
-          // Consider online if activity within last hour
-          status =
-            Date.now() - stat.mtime.getTime() < 60 * 60 * 1000
-              ? "online"
-              : "offline";
-        } catch (e) {
-          // No recent activity
+        } catch {
+          // no memory file today — that's fine
         }
 
         // Get details of allowed subagents
