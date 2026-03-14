@@ -341,6 +341,54 @@ export function getActivityStats(): {
   return { total, today, byType, byStatus };
 }
 
+export function getActivityTimelineStats(): {
+  total: number;
+  today: number;
+  byType: Record<string, number>;
+  byStatus: Record<string, number>;
+  heatmap: Array<{ day: string; count: number }>;
+  trend: Array<{ day: string; count: number; success: number; errors: number }>;
+  hourly: Array<{ hour: string; count: number }>;
+} {
+  const db = getDb();
+  const stats = getActivityStats();
+  const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  const heatmap = db.prepare(`
+    SELECT DATE(timestamp) as day, COUNT(*) as count
+    FROM activities
+    WHERE timestamp >= ?
+    GROUP BY DATE(timestamp)
+    ORDER BY day
+  `).all(cutoff) as Array<{ day: string; count: number }>;
+
+  const trend = db.prepare(`
+    SELECT DATE(timestamp) as day, COUNT(*) as count,
+           SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
+           SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as errors
+    FROM activities
+    WHERE timestamp >= datetime('now', '-7 days')
+    GROUP BY DATE(timestamp)
+    ORDER BY day DESC
+  `).all() as Array<{ day: string; count: number; success: number; errors: number }>;
+
+  const hourly = db.prepare(`
+    SELECT strftime('%H', timestamp) as hour, COUNT(*) as count
+    FROM activities
+    WHERE timestamp >= datetime('now', '-30 days')
+    GROUP BY hour
+    ORDER BY count DESC
+    LIMIT 24
+  `).all() as Array<{ hour: string; count: number }>;
+
+  return {
+    ...stats,
+    heatmap,
+    trend,
+    hourly,
+  };
+}
+
 export function resetActivitiesDbForTests(): void {
   if (_db) {
     _db.close();

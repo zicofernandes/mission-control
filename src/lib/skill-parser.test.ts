@@ -4,7 +4,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAgentSkillMap, getDefaultWorkspaceSkillPaths, scanAllSkills } from "./skill-parser.ts";
+import { buildAgentSkillMap, getDefaultWorkspaceSkillPaths, scanAllSkills } from "./skill-parser";
 
 test("getDefaultWorkspaceSkillPaths returns skill paths for every OPENCLAW_DIRS entry", () => {
   assert.deepEqual(
@@ -12,8 +12,8 @@ test("getDefaultWorkspaceSkillPaths returns skill paths for every OPENCLAW_DIRS 
       OPENCLAW_DIRS: "/Users/zico/.openclaw, /Users/zico/.openclaw-elon",
     }),
     [
-      "/Users/zico/.openclaw/workspace-infra/skills",
-      "/Users/zico/.openclaw-elon/workspace-infra/skills",
+      "/Users/zico/.openclaw/workspace/skills",
+      "/Users/zico/.openclaw-elon/workspace/skills",
     ],
   );
 });
@@ -23,12 +23,12 @@ test("getDefaultWorkspaceSkillPaths falls back to OPENCLAW_DIR", () => {
     getDefaultWorkspaceSkillPaths({
       OPENCLAW_DIR: "/Users/zico/.openclaw",
     }),
-    ["/Users/zico/.openclaw/workspace-infra/skills"],
+    ["/Users/zico/.openclaw/workspace/skills"],
   );
 });
 
 test("getDefaultWorkspaceSkillPaths falls back to the default root path", () => {
-  assert.deepEqual(getDefaultWorkspaceSkillPaths({}), ["/root/.openclaw/workspace-infra/skills"]);
+  assert.deepEqual(getDefaultWorkspaceSkillPaths({}), ["/root/.openclaw/workspace/skills"]);
 });
 
 test("buildAgentSkillMap merges skill ownership across all OPENCLAW_DIRS entries", () => {
@@ -44,8 +44,8 @@ test("buildAgentSkillMap merges skill ownership across all OPENCLAW_DIRS entries
       [firstDir, "athena"],
       [secondDir, "elon"],
     ] as const) {
-      fs.mkdirSync(path.join(dir, "workspace-infra", "skills", sharedSkillName), { recursive: true });
-      fs.writeFileSync(path.join(dir, "workspace-infra", "skills", sharedSkillName, "SKILL.md"), "# Test\n");
+      fs.mkdirSync(path.join(dir, "workspace", "skills", sharedSkillName), { recursive: true });
+      fs.writeFileSync(path.join(dir, "workspace", "skills", sharedSkillName, "SKILL.md"), "# Test\n");
       fs.writeFileSync(
         path.join(dir, "openclaw.json"),
         JSON.stringify({
@@ -53,7 +53,7 @@ test("buildAgentSkillMap merges skill ownership across all OPENCLAW_DIRS entries
             list: [
               {
                 id: agentId,
-                workspace: path.join(dir, "workspace-infra"),
+                workspace: path.join(dir, "workspace"),
               },
             ],
           },
@@ -85,9 +85,9 @@ test("scanAllSkills resolves workspace skills across all default workspace paths
     const secondDir = path.join(tempRoot, "openclaw-elon");
     const skillName = "multi-path-skill";
 
-    fs.mkdirSync(path.join(firstDir, "workspace-infra", "skills"), { recursive: true });
-    fs.mkdirSync(path.join(secondDir, "workspace-infra", "skills", skillName), { recursive: true });
-    fs.writeFileSync(path.join(secondDir, "workspace-infra", "skills", skillName, "SKILL.md"), "# Multi Path\n");
+    fs.mkdirSync(path.join(firstDir, "workspace", "skills"), { recursive: true });
+    fs.mkdirSync(path.join(secondDir, "workspace", "skills", skillName), { recursive: true });
+    fs.writeFileSync(path.join(secondDir, "workspace", "skills", skillName, "SKILL.md"), "# Multi Path\n");
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -99,7 +99,7 @@ test("scanAllSkills resolves workspace skills across all default workspace paths
 
     const skills = scanAllSkills();
     assert.equal(skills.length, 1);
-    assert.equal(skills[0]?.location, path.join(secondDir, "workspace-infra", "skills", skillName));
+    assert.equal(skills[0]?.location, path.join(secondDir, "workspace", "skills", skillName));
   } finally {
     fs.writeFileSync(configPath, originalConfig);
     if (previousOpenclawDirs === undefined) {

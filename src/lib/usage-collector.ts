@@ -2,7 +2,7 @@
  * Usage Collector - Reads gateway session data and calculates costs
  */
 
-import { calculateCost, normalizeModelId } from "./pricing.ts";
+import { calculateCost, normalizeModelId } from "./pricing";
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";

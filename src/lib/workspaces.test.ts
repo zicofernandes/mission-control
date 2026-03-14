@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { listWorkspaces, resolveWorkspacePath } from "./workspaces.ts";
+import { listWorkspaces, resolveWorkspacePath } from "./workspaces";
 
 function makeTempOpenclawDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "mission-control-workspaces-"));
@@ -35,15 +35,15 @@ test("listWorkspaces scans every directory from OPENCLAW_DIRS", () => {
     });
 
     assert.equal(workspaces.length, 4);
-    const mainWorkspaces = workspaces.filter((workspace) => workspace.name === "Workspace Principal");
-    const agentWorkspaces = workspaces.filter((workspace) => workspace.name !== "Workspace Principal");
+    const mainWorkspaces = workspaces.filter((workspace) => path.basename(workspace.path) === "workspace");
+    const agentWorkspaces = workspaces.filter((workspace) => path.basename(workspace.path) !== "workspace");
 
     assert.equal(mainWorkspaces.length, 2);
     assert.equal(agentWorkspaces.length, 2);
     assert.equal(new Set(workspaces.map((workspace) => workspace.id)).size, 4);
     assert.deepEqual(
       mainWorkspaces.map((workspace) => workspace.name),
-      ["Workspace Principal", "Workspace Principal"],
+      ["Tenacitas", "Second Main"],
     );
     assert.deepEqual(
       new Set(mainWorkspaces.map((workspace) => workspace.agentName)),
@@ -64,6 +64,7 @@ test("listWorkspaces scans every directory from OPENCLAW_DIRS", () => {
         agentName: "Infra",
         emoji: "🛠️",
         path: path.join(firstDir, "workspace-infra"),
+        kind: "workspace",
       },
       {
         id: `${secondDir}::workspace-social`,
@@ -71,6 +72,7 @@ test("listWorkspaces scans every directory from OPENCLAW_DIRS", () => {
         agentName: "Social",
         emoji: "📣",
         path: path.join(secondDir, "workspace-social"),
+        kind: "workspace",
       },
     ]);
     assert.equal(
@@ -91,7 +93,7 @@ test("listWorkspaces falls back to OPENCLAW_DIR when OPENCLAW_DIRS is unset", ()
   const openclawDir = makeTempOpenclawDir();
 
   try {
-    fs.mkdirSync(path.join(openclawDir, "workspace"), { recursive: true });
+    writeIdentity(path.join(openclawDir, "workspace"), "Tenacitas", "🦞");
     fs.mkdirSync(path.join(openclawDir, "workspace-research"), { recursive: true });
 
     const workspaces = listWorkspaces({
@@ -108,7 +110,7 @@ test("listWorkspaces falls back to OPENCLAW_DIR when OPENCLAW_DIRS is unset", ()
       [
         {
           id: `${openclawDir}::workspace`,
-          name: "Workspace Principal",
+          name: "Tenacitas",
           agentName: "Tenacitas",
           emoji: "🦞",
         },

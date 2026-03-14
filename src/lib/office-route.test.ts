@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { getAgentStatusFromGateway } from "./office-gateway.ts";
-import { listOfficeAgents } from "./office-route.ts";
+import { getAgentStatusFromGateway } from "./office-gateway";
+import { listOfficeAgents } from "./office-route";
 
 test("getAgentStatusFromGateway queries every configured gateway port and merges sessions", async () => {
   const now = new Date("2026-03-11T12:00:00.000Z").getTime();

@@ -11,7 +11,7 @@ import {
   getActivitiesDbPath,
   logActivity,
   resetActivitiesDbForTests,
-} from './activities-db.ts';
+} from './activities-db';
 
 test('activities-db uses the primary OPENCLAW_DIR database and migrates the agent column', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mission-control-activities-'));

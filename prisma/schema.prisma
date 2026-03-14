@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Activity {
+  id          String   @id
+  timestamp   DateTime
+  type        String
+  description String
+  status      String   @default("success")
+  durationMs  Int?     @map("duration_ms")
+  tokensUsed  Int?     @map("tokens_used")
+  agent       String?
+  metadata    String?
+
+  @@index([timestamp], map: "idx_activities_timestamp")
+  @@index([type], map: "idx_activities_type")
+  @@index([status], map: "idx_activities_status")
+  @@index([agent], map: "idx_activities_agent")
+  @@map("activities")
+}
+
+model UsageSnapshot {
+  id           Int    @id @default(autoincrement())
+  timestamp    Int
+  date         String
+  hour         Int
+  agentId      String @map("agent_id")
+  model        String
+  inputTokens  Int    @map("input_tokens")
+  outputTokens Int    @map("output_tokens")
+  totalTokens  Int    @map("total_tokens")
+  cost         Float
+  createdAt    Int?   @default(dbgenerated("(strftime('%s', 'now'))")) @map("created_at")
+
+  @@index([date], map: "idx_date")
+  @@index([agentId], map: "idx_agent")
+  @@index([model], map: "idx_model")
+  @@index([timestamp], map: "idx_timestamp")
+  @@map("usage_snapshots")
+}

@@ -7,9 +7,17 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "eslint",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
+    "prisma:seed": "prisma db seed",
+    "prisma:validate": "prisma validate",
     "test": "node --test --experimental-strip-types src/lib/*.test.ts"
   },
+  "prisma": {
+    "seed": "node --experimental-strip-types prisma/seed.ts"
+  },
   "dependencies": {
+    "@prisma/client": "^6.6.0",
     "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
@@ -33,6 +41,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "prisma": "^6.6.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

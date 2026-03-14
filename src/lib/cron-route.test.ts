@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { listCronJobsAcrossAgents } from "./cron-jobs.ts";
+import { listCronJobsAcrossAgents } from "./cron-jobs";
 
 function makeTempOpenclawDir(root: string, name: string, agentId: string): string {
   const openclawDir = path.join(root, name);

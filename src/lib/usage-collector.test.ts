@@ -6,7 +6,7 @@ import test from "node:test";
 
 import Database from "better-sqlite3";
 
-import { collectUsage, queryGatewayUsage } from "./usage-collector.ts";
+import { collectUsage, queryGatewayUsage } from "./usage-collector";
 
 test("queryGatewayUsage fetches both gateway ports and tags sessions with agent", async () => {
   const fetchCalls: string[] = [];
