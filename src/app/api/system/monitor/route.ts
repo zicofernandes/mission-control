@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 
 // Services monitored per backend
 const SYSTEMD_SERVICES: string[] = [];
-const PM2_SERVICES = ["classvault", "content-vault", "postiz-simple", "brain"];
+const PM2_SERVICES = ["mission-control", "crm-cron", "docstore-ds", "classvault", "content-vault", "postiz-simple", "brain"];
 // creatoros not deployed yet — shown as "not_deployed"
 const PLACEHOLDER_SERVICES = [
   { name: "creatoros", description: "Creatoros Platform", status: "not_deployed" },
@@ -17,7 +17,6 @@ const PLACEHOLDER_SERVICES = [
 const HTTP_SERVICES: Array<{ name: string; description: string; port: number; backend: string }> = [
   { name: "elon-gateway",    description: "Elon Agent — OpenClaw Gateway",     port: 19001, backend: "launchctl" },
   { name: "athena-gateway",  description: "Athena Agent — OpenClaw Gateway",   port: 18789, backend: "launchctl" },
-  { name: "mission-control", description: "Mission Control — Dashboard",        port: 3000,  backend: "tmux"      },
   { name: "qmd-http",        description: "qmd — Vector Search HTTP API",       port: 8181,  backend: "launchctl" },
 ];
 
@@ -31,6 +30,8 @@ interface ServiceEntry {
   pid?: number | null;
   mem?: number | null;
   cpu?: number | null;
+  port?: number | null;
+  url?: string | null;
 }
 
 interface TailscaleDevice {
@@ -69,11 +70,32 @@ function normalizePm2Status(status: string): string {
 // Friendly display names for PM2 process names
 const SERVICE_DESCRIPTIONS: Record<string, string> = {
   "mission-control": "Mission Control – Dashboard",
+  "crm-cron": "Personal CRM – Contact Discovery Cron",
+  "docstore-ds": "DocStore – Document Storage API",
   classvault: "ClassVault – LMS Platform",
   "content-vault": "Content Vault – Draft Management Webapp",
   "postiz-simple": "Postiz – Social Media Scheduler",
   brain: "Brain – Internal Tools",
   creatoros: "Creatoros Platform",
+};
+
+// Launch URLs for services that have a web UI
+const SERVICE_URLS: Record<string, string> = {
+  "docstore-ds": "http://localhost:3002/graphql",
+  classvault: "http://localhost:3004",
+  "content-vault": "http://localhost:3005",
+  "postiz-simple": "http://localhost:3006",
+  brain: "http://localhost:3007",
+};
+
+// Port numbers for services
+const SERVICE_PORTS: Record<string, number> = {
+  "mission-control": 3000,
+  "docstore-ds": 3002,
+  classvault: 3004,
+  "content-vault": 3005,
+  "postiz-simple": 3006,
+  brain: 3007,
 };
 
 export async function GET() {
@@ -209,6 +231,8 @@ export async function GET() {
             status: "unknown",
             description: SERVICE_DESCRIPTIONS[name] ?? name,
             backend: "pm2",
+            port: SERVICE_PORTS[name] ?? null,
+            url: SERVICE_URLS[name] ?? null,
           });
           continue;
         }
@@ -229,6 +253,8 @@ export async function GET() {
           pid: proc.pid,
           cpu: proc.pm2_env?.monit?.cpu ?? null,
           mem: proc.pm2_env?.monit?.memory ?? null,
+          port: SERVICE_PORTS[name] ?? null,
+          url: SERVICE_URLS[name] ?? null,
         });
       }
     } catch (err) {

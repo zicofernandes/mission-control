@@ -13,6 +13,8 @@ interface SystemdService {
   pid?: number | null;
   mem?: number | null;
   cpu?: number | null;
+  port?: number | null;
+  url?: string | null;
 }
 
 interface TailscaleDevice {
@@ -365,7 +367,25 @@ export default function SystemMonitorPage() {
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{svc.description || "—"}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{svc.description || "—"}</span>
+                              {svc.port && (
+                                <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--card-elevated)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                                  :{svc.port}
+                                </span>
+                              )}
+                              {svc.url && svc.status === "active" && (
+                                <a
+                                  href={svc.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs px-2 py-0.5 rounded inline-flex items-center gap-1"
+                                  style={{ backgroundColor: "rgba(96,165,250,0.12)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.3)" }}
+                                >
+                                  ↗ Open
+                                </a>
+                              )}
+                            </div>
                             {svc.uptime != null && svc.status === "active" && (
                               <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                                 up {formatUptime(svc.uptime)}
