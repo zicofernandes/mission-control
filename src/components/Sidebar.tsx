@@ -28,6 +28,8 @@ import {
   GitFork,
   SquareTerminal,
   History,
+  ListTodo,
+  FolderKanban,
 } from "lucide-react";
 import { getAgentDisplayName } from "@/config/branding";
 
@@ -41,6 +43,8 @@ const navItems = [
   { href: "/terminal", label: "Terminal", icon: SquareTerminal },
   { href: "/git", label: "Git", icon: GitFork },
   { href: "/workflows", label: "Workflows", icon: Workflow },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/files", label: "Files", icon: FolderOpen },
