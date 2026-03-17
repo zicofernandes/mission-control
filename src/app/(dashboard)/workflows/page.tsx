@@ -1,6 +1,17 @@
 "use client";
 
-import { BRANDING } from "@/config/branding";
+import { useEffect, useState } from "react";
+import { CheckCircle, Clock, Zap, TrendingUp, Shield, Brain, DollarSign, Users, GitBranch, BarChart3, Play, AlertCircle } from "lucide-react";
+
+interface CronJob {
+  id: string;
+  name: string;
+  enabled: boolean;
+  schedule: { kind: string; expr?: string; everyMs?: number; tz?: string };
+  state: { lastRunStatus?: string; lastDurationMs?: number; nextRunAtMs?: number; consecutiveErrors?: number };
+  payload: { kind: string; timeoutSeconds?: number };
+  agentId: string;
+}
 
 interface Workflow {
   id: string;
@@ -8,379 +19,349 @@ interface Workflow {
   name: string;
   description: string;
   schedule: string;
-  steps: string[];
-  status: "active" | "inactive";
-  trigger: "cron" | "demand";
+  category: "infrastructure" | "revenue" | "intelligence" | "delivery";
+  status: "active" | "proposed" | "inactive";
+  owner: "elon" | "athena" | "both";
+  cronId?: string;
+  priority?: number;
 }
 
-const WORKFLOWS: Workflow[] = [
+const PROPOSED_WORKFLOWS: Workflow[] = [
+  // ── Revenue ──────────────────────────────────────────────────────────────
   {
-    id: "social-radar",
-    emoji: "🔭",
-    name: "Social Radar",
-    description: "Monitoriza menciones, oportunidades de colaboración y conversaciones relevantes en redes sociales y foros.",
-    schedule: "9:30h y 17:30h (cada día)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      `Busca menciones de ${BRANDING.twitterHandle} en Twitter/X, LinkedIn e Instagram`,
-      "Revisa hilos de Reddit en r/webdev, r/javascript, r/learnprogramming",
-      `Detecta oportunidades de colaboración y collabs entrantes (${BRANDING.ownerCollabEmail})`,
-      "Monitoriza aprendiendo.dev en conversaciones y menciones",
-      "Envía resumen por Telegram si hay algo relevante",
-    ],
+    id: "lead-radar",
+    emoji: "🎯",
+    name: "Lead Radar",
+    description: "Scans Twitter/LinkedIn/Reddit for people asking for AI automation help. Surfaces warm leads to Zico daily with context on their pain point.",
+    schedule: "Daily 9 AM CST",
+    category: "revenue",
+    status: "proposed",
+    owner: "elon",
+    priority: 1,
   },
   {
-    id: "noticias-ia",
-    emoji: "📰",
-    name: "Noticias IA y Web",
-    description: "Resume las noticias más relevantes de IA y desarrollo web del timeline de Twitter para arrancar el día informado.",
-    schedule: "7:45h (cada día)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Lee el timeline de Twitter/X via bird CLI",
-      "Filtra noticias de IA, web dev, arquitectura y herramientas dev",
-      "Selecciona 5-7 noticias más relevantes para el nicho de Carlos",
-      "Genera resumen estructurado con enlace y contexto",
-      "Envía digest por Telegram",
-    ],
-  },
-  {
-    id: "trend-monitor",
-    emoji: "🔥",
-    name: "Trend Monitor",
-    description: "Radar de tendencias urgentes en el nicho tech. Detecta temas virales antes de que exploten para aprovechar la ola de contenido.",
-    schedule: "7h, 10h, 15h y 20h (cada día)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Monitoriza trending topics en Twitter/X relacionados con tech y programación",
-      "Busca en Hacker News, dev.to y GitHub Trending",
-      "Evalúa si el trend es relevante para el canal de Carlos",
-      "Si detecta algo urgente, notifica inmediatamente con contexto",
-      "Sugiere ángulo de contenido si el trend tiene potencial",
-    ],
-  },
-  {
-    id: "daily-linkedin",
+    id: "pipeline-monitor",
     emoji: "📊",
-    name: "Daily LinkedIn Brief",
-    description: "Genera el post de LinkedIn del día basado en las noticias más relevantes de Hacker News, dev.to y la web tech.",
-    schedule: "9h (cada día)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Recopila top posts de Hacker News (front page tech/dev)",
-      "Revisa trending en dev.to y artículos destacados",
-      "Selecciona tema con mayor potencial de engagement para la audiencia de Carlos",
-      "Redacta post de LinkedIn en la voz de Carlos (profesional-cercano, sin emojis ni hashtags)",
-      "Envía borrador por Telegram para revisión y publicación",
-    ],
+    name: "Pipeline Monitor",
+    description: "Tracks active client conversations in the CRM. Flags any prospect that's gone cold (no activity >3 days) and drafts a follow-up message for Zico's review.",
+    schedule: "Daily 8 AM CST",
+    category: "revenue",
+    status: "proposed",
+    owner: "elon",
+    priority: 1,
   },
   {
-    id: "newsletter-digest",
-    emoji: "📬",
-    name: "Newsletter Digest",
-    description: "Digest curado de las newsletters del día. Consolida lo mejor de las suscripciones de Carlos en un resumen accionable.",
-    schedule: "20h (cada día)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Accede a Gmail y busca newsletters recibidas en el día",
-      "Filtra por remitentes relevantes (tech, IA, productividad, inversiones)",
-      "Extrae los puntos clave de cada newsletter",
-      "Genera digest estructurado por categorías",
-      "Envía resumen por Telegram",
-    ],
+    id: "proposal-generator",
+    emoji: "📝",
+    name: "Proposal Generator",
+    description: "When Zico identifies a prospect, auto-drafts a custom proposal based on their industry + pain point. Sends draft to MC review queue before any client-facing send.",
+    schedule: "On demand",
+    category: "revenue",
+    status: "proposed",
+    owner: "elon",
+    priority: 2,
+  },
+  // ── Infrastructure ────────────────────────────────────────────────────────
+  {
+    id: "workspace-git-backup",
+    emoji: "💾",
+    name: "Workspace Git Backup",
+    description: "Auto-commits and pushes workspace changes every 6h. Prevents drift and ensures work survives Mac mini restarts.",
+    schedule: "Every 6h",
+    category: "infrastructure",
+    status: "proposed",
+    owner: "elon",
+    priority: 1,
   },
   {
-    id: "email-categorization",
-    emoji: "📧",
-    name: "Email Categorization",
-    description: "Categoriza y resume los emails del día para que Carlos empiece la jornada sin inbox anxiety.",
-    schedule: "7:45h (cada día)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Accede a Gmail y lee emails no leídos del día",
-      "Categoriza: urgente / colabs / facturas / universidad / newsletters / otros",
-      "Resumen de cada categoría con acción recomendada",
-      "Detecta emails de clientes con facturas pendientes (>90 días)",
-      "Envía resumen estructurado por Telegram",
-    ],
+    id: "nightly-evolution",
+    emoji: "🔧",
+    name: "Nightly Evolution",
+    description: "After nightly reflection, picks the single highest-leverage improvement and ships it autonomously (within defined scope). Reflection without action is wasted cycles.",
+    schedule: "3 AM CST (after reflection)",
+    category: "infrastructure",
+    status: "proposed",
+    owner: "both",
+    priority: 1,
   },
   {
-    id: "weekly-newsletter",
-    emoji: "📅",
-    name: "Weekly Newsletter",
-    description: "Recapitulación semanal automática de los tweets y posts de LinkedIn para usar como base de la newsletter.",
-    schedule: "Domingos 18h",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      `Recopila tweets de la semana (${BRANDING.twitterHandle} via bird CLI)`,
-      "Recopila posts publicados en LinkedIn",
-      "Organiza por temas y relevancia",
-      "Genera borrador de recapitulación semanal en tono newsletter",
-      "Envía por Telegram para revisión antes de publicar",
-    ],
+    id: "client-delivery-monitor",
+    emoji: "🚀",
+    name: "Client Delivery Monitor",
+    description: "After any build ships, runs smoke tests and notifies client automatically. Tracks SLA — flags if 48h pass with no commit or update on an active engagement.",
+    schedule: "Every 2h during active builds",
+    category: "delivery",
+    status: "proposed",
+    owner: "elon",
+    priority: 2,
   },
+  // ── Intelligence ──────────────────────────────────────────────────────────
   {
     id: "advisory-board",
     emoji: "🏛️",
     name: "Advisory Board",
-    description: "7 AI advisors with distinct personalities and memories. Consult any advisor or convene the full board.",
+    description: "On-demand CFO/CMO/CTO/Growth/Legal/Coach personas consulted on business decisions. Structured prompt library routed through Athena. High leverage for Zico decisions.",
     schedule: "On demand",
-    trigger: "demand",
-    status: "active",
-    steps: [
-      "User sends /cfo, /cmo, /cto, /legal, /growth, /coach or /product",
-      "Agent loads the advisory-board/SKILL.md skill",
-      "Reads the corresponding advisor memory file (memory/advisors/)",
-      "Responds in the advisor's voice and personality with full context",
-      "Updates the memory file with learnings from the consultation",
-      "/board convenes all 7 advisors in sequence and compiles a full board meeting",
-    ],
+    category: "intelligence",
+    status: "proposed",
+    owner: "athena",
+    priority: 2,
   },
   {
-    id: "git-backup",
-    emoji: "🔄",
-    name: "Git Backup",
-    description: "Auto-commit and push the workspace every 4 hours to ensure nothing is lost.",
-    schedule: "Every 4h",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Check for changes in the agent workspace",
-      "If changes exist: git add -A",
-      "Generate automatic commit message with timestamp and change summary",
-      "git push to remote repository",
-      "Silent if no changes — only notifies on error",
-    ],
+    id: "social-radar",
+    emoji: "📡",
+    name: "Social Radar",
+    description: "Monitors LinkedIn/Twitter/Reddit for ICP signals, competitor moves, and content opportunities relevant to Limitless Era.",
+    schedule: "Daily 9 AM CST",
+    category: "intelligence",
+    status: "proposed",
+    owner: "athena",
+    priority: 3,
   },
   {
-    id: "nightly-evolution",
-    emoji: "🌙",
-    name: "Nightly Evolution",
-    description: "Sesión autónoma nocturna que implementa mejoras en Mission Control según el ROADMAP o inventa features nuevas útiles.",
-    schedule: "3h (cada noche)",
-    trigger: "cron",
-    status: "active",
-    steps: [
-      "Lee ROADMAP.md de Mission Control para seleccionar la siguiente feature",
-      "Si no hay features claras, analiza el estado actual e inventa algo útil",
-      "Implementa la feature completa (código, tests si aplica, UI)",
-      "Verifica que el build de Next.js no falla",
-      "Notifica a Carlos por Telegram con el resumen de lo implementado",
-    ],
+    id: "competitive-intel",
+    emoji: "🔭",
+    name: "Competitive Intel",
+    description: "Weekly scan of what other AI automation agencies are shipping and pricing. Surfaces positioning gaps and opportunities.",
+    schedule: "Weekly Monday 8 AM",
+    category: "intelligence",
+    status: "proposed",
+    owner: "athena",
+    priority: 3,
+  },
+  {
+    id: "weekly-business-brief",
+    emoji: "📈",
+    name: "Weekly Business Brief",
+    description: "Every Monday: revenue, pipeline state, active builds, what moved the needle last week, and the top priority for this week.",
+    schedule: "Weekly Monday 7 AM",
+    category: "intelligence",
+    status: "proposed",
+    owner: "both",
+    priority: 2,
   },
 ];
 
-function StatusBadge({ status }: { status: "active" | "inactive" }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-      <div style={{
-        width: "6px",
-        height: "6px",
-        borderRadius: "50%",
-        backgroundColor: status === "active" ? "var(--positive)" : "var(--text-muted)",
-      }} />
-      <span style={{
-        fontFamily: "var(--font-body)",
-        fontSize: "10px",
-        fontWeight: 600,
-        color: status === "active" ? "var(--positive)" : "var(--text-muted)",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px",
-      }}>
-        {status === "active" ? "Activo" : "Inactivo"}
-      </span>
-    </div>
-  );
+const CATEGORY_META: Record<Workflow["category"], { label: string; color: string; icon: React.ReactNode }> = {
+  revenue: { label: "Revenue", color: "#34d399", icon: <DollarSign size={14} /> },
+  infrastructure: { label: "Infrastructure", color: "#60a5fa", icon: <Shield size={14} /> },
+  intelligence: { label: "Intelligence", color: "#a78bfa", icon: <Brain size={14} /> },
+  delivery: { label: "Delivery", color: "#f59e0b", icon: <Zap size={14} /> },
+};
+
+function formatMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
 }
 
-function TriggerBadge({ trigger }: { trigger: "cron" | "demand" }) {
-  return (
-    <div style={{
-      padding: "2px 7px",
-      backgroundColor: trigger === "cron"
-        ? "rgba(59, 130, 246, 0.12)"
-        : "rgba(168, 85, 247, 0.12)",
-      border: `1px solid ${trigger === "cron" ? "rgba(59, 130, 246, 0.25)" : "rgba(168, 85, 247, 0.25)"}`,
-      borderRadius: "5px",
-      fontFamily: "var(--font-body)",
-      fontSize: "10px",
-      fontWeight: 600,
-      color: trigger === "cron" ? "#60a5fa" : "var(--accent)",
-      letterSpacing: "0.4px",
-      textTransform: "uppercase" as const,
-    }}>
-      {trigger === "cron" ? "⏱ Cron" : "⚡ Demanda"}
-    </div>
-  );
+function formatCronExpr(job: CronJob): string {
+  if (job.schedule.kind === "cron" && job.schedule.expr) {
+    return job.schedule.expr + (job.schedule.tz ? ` (${job.schedule.tz})` : "");
+  }
+  if (job.schedule.kind === "every" && job.schedule.everyMs) {
+    const min = job.schedule.everyMs / 60000;
+    if (min < 60) return `Every ${min}m`;
+    return `Every ${min / 60}h`;
+  }
+  return job.schedule.kind;
 }
 
 export default function WorkflowsPage() {
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"active" | "proposed">("active");
+
+  useEffect(() => {
+    fetch("/api/cron")
+      .then((r) => r.json())
+      .then((data) => {
+        setCronJobs(Array.isArray(data) ? data : data.jobs ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const activeWorkflows = cronJobs.filter((j) => j.enabled);
+  const proposedByPriority = [...PROPOSED_WORKFLOWS].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+
   return (
-    <div style={{ padding: "24px" }}>
-      {/* Header */}
-      <div style={{ marginBottom: "32px" }}>
-        <h1 style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: "24px",
-          fontWeight: 700,
-          letterSpacing: "-1px",
-          color: "var(--text-primary)",
-          marginBottom: "4px",
-        }}>
-          Workflows
+    <div style={{ color: "var(--text-primary)", maxWidth: 1100 }}>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)", letterSpacing: "-1px" }}>
+          ⚙️ Workflows
         </h1>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: "13px", color: "var(--text-secondary)" }}>
-          {WORKFLOWS.filter(w => w.status === "active").length} flujos activos · {WORKFLOWS.filter(w => w.trigger === "cron").length} crons automáticos · {WORKFLOWS.filter(w => w.trigger === "demand").length} bajo demanda
+        <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
+          Active automations running across Elon + Athena · {activeWorkflows.length} live · {PROPOSED_WORKFLOWS.length} proposed
         </p>
       </div>
 
-      {/* Stats row */}
-      <div style={{ display: "flex", gap: "12px", marginBottom: "32px", flexWrap: "wrap" }}>
-        {[
-          { label: "Total workflows", value: WORKFLOWS.length, color: "var(--text-primary)" },
-          { label: "Crons activos", value: WORKFLOWS.filter(w => w.trigger === "cron" && w.status === "active").length, color: "#60a5fa" },
-          { label: "Bajo demanda", value: WORKFLOWS.filter(w => w.trigger === "demand").length, color: "var(--accent)" },
-        ].map((stat) => (
-          <div key={stat.label} style={{
-            padding: "16px 20px",
-            backgroundColor: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "12px",
-            minWidth: "140px",
-          }}>
-            <div style={{
-              fontFamily: "var(--font-heading)",
-              fontSize: "28px",
-              fontWeight: 700,
-              color: stat.color,
-              letterSpacing: "-1px",
-            }}>
-              {stat.value}
-            </div>
-            <div style={{
-              fontFamily: "var(--font-body)",
-              fontSize: "11px",
-              color: "var(--text-muted)",
-              marginTop: "2px",
-            }}>
-              {stat.label}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Workflow cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        {WORKFLOWS.map((workflow) => (
-          <div key={workflow.id} style={{
-            backgroundColor: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: "16px",
-            padding: "20px 24px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-          }}>
-            {/* Card header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px", gap: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "10px",
-                  backgroundColor: "var(--surface-elevated)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "20px",
-                  border: "1px solid var(--border-strong)",
-                  flexShrink: 0,
-                }}>
-                  {workflow.emoji}
-                </div>
-                <div>
-                  <h3 style={{
-                    fontFamily: "var(--font-heading)",
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    color: "var(--text-primary)",
-                    letterSpacing: "-0.3px",
-                    marginBottom: "2px",
-                  }}>
-                    {workflow.name}
-                  </h3>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <TriggerBadge trigger={workflow.trigger} />
-                    <StatusBadge status={workflow.status} />
-                  </div>
-                </div>
-              </div>
-              {/* Schedule */}
-              <div style={{
-                padding: "6px 12px",
-                backgroundColor: "var(--surface-elevated)",
-                border: "1px solid var(--border)",
-                borderRadius: "8px",
-                fontFamily: "var(--font-body)",
-                fontSize: "11px",
-                color: "var(--text-secondary)",
-                whiteSpace: "nowrap" as const,
-                flexShrink: 0,
-              }}>
-                🕐 {workflow.schedule}
-              </div>
-            </div>
-
-            {/* Description */}
-            <p style={{
-              fontFamily: "var(--font-body)",
-              fontSize: "13px",
-              color: "var(--text-secondary)",
-              lineHeight: "1.6",
-              marginBottom: "16px",
-            }}>
-              {workflow.description}
-            </p>
-
-            {/* Steps */}
-            <div style={{
-              backgroundColor: "var(--surface-elevated)",
-              borderRadius: "10px",
-              padding: "12px 16px",
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6">
+        {(["active", "proposed"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="px-4 py-2 rounded text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: activeTab === tab ? "var(--accent)" : "var(--card)",
+              color: activeTab === tab ? "#fff" : "var(--text-secondary)",
               border: "1px solid var(--border)",
-            }}>
-              <div style={{
-                fontFamily: "var(--font-body)",
-                fontSize: "10px",
-                fontWeight: 600,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.7px",
-                marginBottom: "8px",
-              }}>
-                Pasos
-              </div>
-              <ol style={{ margin: 0, padding: "0 0 0 16px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                {workflow.steps.map((step, i) => (
-                  <li key={i} style={{
-                    fontFamily: "var(--font-body)",
-                    fontSize: "12px",
-                    color: "var(--text-secondary)",
-                    lineHeight: "1.5",
-                  }}>
-                    {step}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
+            }}
+          >
+            {tab === "active" ? `✅ Active (${activeWorkflows.length})` : `💡 Proposed (${PROPOSED_WORKFLOWS.length})`}
+          </button>
         ))}
       </div>
+
+      {/* Active Crons */}
+      {activeTab === "active" && (
+        <div>
+          {loading ? (
+            <p style={{ color: "var(--text-muted)" }}>Loading cron jobs…</p>
+          ) : activeWorkflows.length === 0 ? (
+            <p style={{ color: "var(--text-muted)" }}>No active cron jobs found.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {activeWorkflows.map((job) => {
+                const hasError = (job.state.consecutiveErrors ?? 0) > 0;
+                const lastStatus = job.state.lastRunStatus;
+                return (
+                  <div
+                    key={job.id}
+                    className="rounded-lg p-4"
+                    style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>
+                            {job.name}
+                          </span>
+                          <span
+                            className="text-xs px-2 py-0.5 rounded"
+                            style={{
+                              backgroundColor: job.agentId === "elon" ? "rgba(96,165,250,0.12)" : "rgba(167,139,250,0.12)",
+                              color: job.agentId === "elon" ? "#60a5fa" : "#a78bfa",
+                              border: `1px solid ${job.agentId === "elon" ? "rgba(96,165,250,0.3)" : "rgba(167,139,250,0.3)"}`,
+                            }}
+                          >
+                            {job.agentId === "elon" ? "⚙️ Elon" : "🏛️ Athena"}
+                          </span>
+                          {hasError && (
+                            <span className="text-xs px-2 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: "var(--error-bg)", color: "var(--error)" }}>
+                              <AlertCircle size={10} /> {job.state.consecutiveErrors} error{(job.state.consecutiveErrors ?? 0) > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>
+                            <Clock size={10} className="inline mr-1" />{formatCronExpr(job)}
+                          </span>
+                          {job.payload.timeoutSeconds && (
+                            <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                              timeout: {job.payload.timeoutSeconds}s
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {lastStatus && (
+                          <span
+                            className="text-xs px-2 py-1 rounded"
+                            style={{
+                              backgroundColor: lastStatus === "ok" ? "var(--success-bg)" : lastStatus === "error" ? "var(--error-bg)" : "var(--card-elevated)",
+                              color: lastStatus === "ok" ? "var(--success)" : lastStatus === "error" ? "var(--error)" : "var(--text-muted)",
+                            }}
+                          >
+                            {lastStatus === "ok" ? "✓ ok" : lastStatus === "error" ? "✗ error" : lastStatus}
+                            {job.state.lastDurationMs ? ` · ${formatMs(job.state.lastDurationMs)}` : ""}
+                          </span>
+                        )}
+                        {job.state.nextRunAtMs && (
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                            next: {new Date(job.state.nextRunAtMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Proposed Workflows */}
+      {activeTab === "proposed" && (
+        <div>
+          <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+            <p className="text-sm" style={{ color: "#f59e0b" }}>
+              💡 These workflows are designed around the $1M revenue goal. P1 items directly drive pipeline. P2 items protect delivery quality and leverage intelligence. P3 items activate once first clients close.
+            </p>
+          </div>
+
+          {/* Group by category */}
+          {(["revenue", "infrastructure", "delivery", "intelligence"] as const).map((cat) => {
+            const items = proposedByPriority.filter((w) => w.category === cat);
+            if (items.length === 0) return null;
+            const meta = CATEGORY_META[cat];
+            return (
+              <div key={cat} className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span style={{ color: meta.color }}>{meta.icon}</span>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: meta.color }}>
+                    {meta.label}
+                  </h2>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {items.map((wf) => (
+                    <div
+                      key={wf.id}
+                      className="rounded-lg p-4"
+                      style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-semibold text-sm">{wf.emoji} {wf.name}</span>
+                            <span
+                              className="text-xs px-1.5 py-0.5 rounded font-mono"
+                              style={{ backgroundColor: "var(--card-elevated)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+                            >
+                              P{wf.priority}
+                            </span>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded"
+                              style={{
+                                backgroundColor: wf.owner === "elon" ? "rgba(96,165,250,0.12)" : wf.owner === "athena" ? "rgba(167,139,250,0.12)" : "rgba(52,211,153,0.12)",
+                                color: wf.owner === "elon" ? "#60a5fa" : wf.owner === "athena" ? "#a78bfa" : "#34d399",
+                              }}
+                            >
+                              {wf.owner === "elon" ? "⚙️ Elon" : wf.owner === "athena" ? "🏛️ Athena" : "⚙️🏛️ Both"}
+                            </span>
+                          </div>
+                          <p className="text-sm mb-2" style={{ color: "var(--text-secondary)" }}>{wf.description}</p>
+                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                            <Clock size={10} className="inline mr-1" />{wf.schedule}
+                          </span>
+                        </div>
+                        <span
+                          className="text-xs px-2 py-1 rounded flex-shrink-0"
+                          style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.2)" }}
+                        >
+                          Proposed
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
