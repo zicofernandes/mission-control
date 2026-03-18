@@ -7,7 +7,7 @@ const execAsync = promisify(exec);
 
 // Services monitored per backend
 const SYSTEMD_SERVICES: string[] = [];
-const PM2_SERVICES = ["mission-control", "crm-ui", "crm-cron", "docstore-ds", "classvault", "content-vault", "postiz-simple", "brain"];
+const PM2_SERVICES = ["mission-control", "crm-full", "crm-cron", "docstore-ds", "classvault", "content-vault", "postiz-simple", "brain"];
 // creatoros not deployed yet — shown as "not_deployed"
 const PLACEHOLDER_SERVICES = [
   { name: "creatoros", description: "Creatoros Platform", status: "not_deployed" },
@@ -70,7 +70,7 @@ function normalizePm2Status(status: string): string {
 // Friendly display names for PM2 process names
 const SERVICE_DESCRIPTIONS: Record<string, string> = {
   "mission-control": "Mission Control – Dashboard",
-  "crm-ui": "Personal CRM – Admin UI",
+  "crm-full": "CRM Dashboard (Leads, Contacts, Pipeline)",
   "crm-cron": "Personal CRM – Contact Discovery Cron",
   "docstore-ds": "DocStore – Document Storage API",
   classvault: "ClassVault – LMS Platform",
@@ -82,7 +82,7 @@ const SERVICE_DESCRIPTIONS: Record<string, string> = {
 
 // Launch URLs for services that have a web UI
 const SERVICE_URLS: Record<string, string> = {
-  "crm-ui": "http://localhost:3010",
+  "crm-full": "http://localhost:3004",
   "docstore-ds": "http://localhost:3002/graphql",
   classvault: "http://localhost:3004",
   "content-vault": "http://localhost:3005",
@@ -93,7 +93,7 @@ const SERVICE_URLS: Record<string, string> = {
 // Port numbers for services
 const SERVICE_PORTS: Record<string, number> = {
   "mission-control": 3000,
-  "crm-ui": 3010,
+  "crm-full": 3004,
   "docstore-ds": 3002,
   classvault: 3004,
   "content-vault": 3005,
