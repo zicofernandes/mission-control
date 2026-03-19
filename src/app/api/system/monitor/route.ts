@@ -128,41 +128,43 @@ export async function GET() {
     }
     const diskPercent = (diskUsed / diskTotal) * 100;
 
-    // ── Network (real stats from /proc/net/dev) ───────────────────────────────
+    // ── Network (real stats from /proc/net/dev — Linux only) ─────────────────
     let network = { rx: 0, tx: 0 };
-    try {
-      const { readFileSync } = await import('fs');
-      
-      function readNetStats(): { rx: number; tx: number; ts: number } {
-        const netDev = readFileSync('/proc/net/dev', 'utf-8');
-        const lines = netDev.trim().split('\n').slice(2);
-        let rx = 0, tx = 0;
-        for (const line of lines) {
-          const parts = line.trim().split(/\s+/);
-          const iface = parts[0].replace(':', '');
-          if (iface === 'lo') continue;
-          rx += parseInt(parts[1]) || 0;
-          tx += parseInt(parts[9]) || 0;
+    if (process.platform === 'linux') {
+      try {
+        const { readFileSync } = await import('fs');
+        
+        function readNetStats(): { rx: number; tx: number; ts: number } {
+          const netDev = readFileSync('/proc/net/dev', 'utf-8');
+          const lines = netDev.trim().split('\n').slice(2);
+          let rx = 0, tx = 0;
+          for (const line of lines) {
+            const parts = line.trim().split(/\s+/);
+            const iface = parts[0].replace(':', '');
+            if (iface === 'lo') continue;
+            rx += parseInt(parts[1]) || 0;
+            tx += parseInt(parts[9]) || 0;
+          }
+          return { rx, tx, ts: Date.now() };
         }
-        return { rx, tx, ts: Date.now() };
-      }
-      
-      const current = readNetStats();
-      
-      // Use module-level cache for previous reading
-      if ((global as Record<string, unknown>).__netPrev) {
-        const prev = (global as Record<string, unknown>).__netPrev as { rx: number; tx: number; ts: number };
-        const dtSec = (current.ts - prev.ts) / 1000;
-        if (dtSec > 0) {
-          network = {
-            rx: parseFloat(Math.max(0, (current.rx - prev.rx) / 1024 / 1024 / dtSec).toFixed(3)),
-            tx: parseFloat(Math.max(0, (current.tx - prev.tx) / 1024 / 1024 / dtSec).toFixed(3)),
-          };
+        
+        const current = readNetStats();
+        
+        // Use module-level cache for previous reading
+        if ((global as Record<string, unknown>).__netPrev) {
+          const prev = (global as Record<string, unknown>).__netPrev as { rx: number; tx: number; ts: number };
+          const dtSec = (current.ts - prev.ts) / 1000;
+          if (dtSec > 0) {
+            network = {
+              rx: parseFloat(Math.max(0, (current.rx - prev.rx) / 1024 / 1024 / dtSec).toFixed(3)),
+              tx: parseFloat(Math.max(0, (current.tx - prev.tx) / 1024 / 1024 / dtSec).toFixed(3)),
+            };
+          }
         }
+        (global as Record<string, unknown>).__netPrev = current;
+      } catch (error) {
+        console.error("Failed to get network stats:", error);
       }
-      (global as Record<string, unknown>).__netPrev = current;
-    } catch (error) {
-      console.error("Failed to get network stats:", error);
     }
 
     // ── Services ─────────────────────────────────────────────────────────────

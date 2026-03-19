@@ -12,7 +12,12 @@ import {
 } from "react";
 import { ExternalLink, FolderKanban, Globe, Github, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
+  CATEGORY_LABELS,
   EMPTY_PROJECT_FORM,
+  PROJECT_CATEGORIES,
+  PROJECT_STATUSES,
+  STATUS_COLORS,
+  STATUS_LABELS,
   formatProjectTimestamp,
   summarizeProjects,
   toProjectPayload,
@@ -77,6 +82,8 @@ export default function ProjectsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
 
   const fetchProjects = useCallback(async () => {
     setIsLoading(true);
@@ -98,6 +105,14 @@ export default function ProjectsPage() {
   }, [fetchProjects]);
 
   const summary = useMemo(() => summarizeProjects(projects), [projects]);
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter((p) => {
+      if (filterCategory && p.category !== filterCategory) return false;
+      if (filterStatus && p.status !== filterStatus) return false;
+      return true;
+    });
+  }, [projects, filterCategory, filterStatus]);
 
   const resetForm = () => {
     setForm(EMPTY_PROJECT_FORM);
@@ -140,6 +155,8 @@ export default function ProjectsPage() {
       description: project.description,
       repositoryUrl: project.repositoryUrl ?? "",
       productionUrl: project.productionUrl ?? "",
+      category: project.category ?? "",
+      status: project.status ?? "active",
     });
   };
 

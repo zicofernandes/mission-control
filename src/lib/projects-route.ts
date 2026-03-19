@@ -1,4 +1,4 @@
-import { createProject, deleteProject, getProject, listProjects, updateProject } from './projects';
+import { PROJECT_CATEGORIES, PROJECT_STATUSES, ProjectCategory, ProjectStatus, createProject, deleteProject, getProject, listProjects, updateProject } from './projects';
 
 function json(data: unknown, init?: ResponseInit): Response {
   return Response.json(data, init);
@@ -18,7 +18,14 @@ export async function handleProjectsGet(request: Request): Promise<Response> {
       return project ? json(project) : notFoundResponse();
     }
 
-    const projects = await listProjects();
+    const categoryParam = searchParams.get('category');
+    const statusParam = searchParams.get('status');
+    const category = categoryParam && PROJECT_CATEGORIES.includes(categoryParam as ProjectCategory)
+      ? (categoryParam as ProjectCategory) : undefined;
+    const status = statusParam && PROJECT_STATUSES.includes(statusParam as ProjectStatus)
+      ? (statusParam as ProjectStatus) : undefined;
+
+    const projects = await listProjects(category || status ? { category, status } : undefined);
     return json(projects);
   } catch (error) {
     console.error('Failed to list projects:', error);

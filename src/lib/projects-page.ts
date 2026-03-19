@@ -1,10 +1,14 @@
-import type { CreateProjectInput, ProjectRecord } from './projects';
+import type { CreateProjectInput, ProjectCategory, ProjectRecord, ProjectStatus } from './projects';
+export type { ProjectCategory, ProjectStatus };
+export { PROJECT_CATEGORIES, PROJECT_STATUSES } from './projects';
 
 export interface ProjectFormState {
   name: string;
   description: string;
   repositoryUrl: string;
   productionUrl: string;
+  category: ProjectCategory | '';
+  status: ProjectStatus;
 }
 
 export interface ProjectsSummary {
@@ -12,6 +16,7 @@ export interface ProjectsSummary {
   withRepository: number;
   live: number;
   recentlyUpdated: number;
+  blocked: number;
 }
 
 export const EMPTY_PROJECT_FORM: ProjectFormState = {
@@ -19,6 +24,32 @@ export const EMPTY_PROJECT_FORM: ProjectFormState = {
   description: '',
   repositoryUrl: '',
   productionUrl: '',
+  category: '',
+  status: 'active',
+};
+
+export const CATEGORY_LABELS: Record<ProjectCategory, string> = {
+  internal: 'Internal',
+  client: 'Client',
+  product: 'Product',
+  content: 'Content',
+  research: 'Research',
+};
+
+export const STATUS_LABELS: Record<ProjectStatus, string> = {
+  active: 'Active',
+  blocked: 'Blocked',
+  paused: 'Paused',
+  completed: 'Completed',
+  archived: 'Archived',
+};
+
+export const STATUS_COLORS: Record<ProjectStatus, string> = {
+  active: '#4ade80',
+  blocked: '#f47067',
+  paused: '#fbbf24',
+  completed: '#60a5fa',
+  archived: '#6b7280',
 };
 
 function normalizeNullableField(value: string): string | null {
@@ -32,6 +63,8 @@ export function toProjectPayload(form: ProjectFormState): CreateProjectInput {
     description: form.description.trim(),
     repositoryUrl: normalizeNullableField(form.repositoryUrl),
     productionUrl: normalizeNullableField(form.productionUrl),
+    category: form.category || null,
+    status: form.status,
   };
 }
 
@@ -51,9 +84,10 @@ export function summarizeProjects(
       summary.withRepository += project.repositoryUrl ? 1 : 0;
       summary.live += project.productionUrl ? 1 : 0;
       summary.recentlyUpdated += isRecent ? 1 : 0;
+      summary.blocked += project.status === 'blocked' ? 1 : 0;
       return summary;
     },
-    { total: 0, withRepository: 0, live: 0, recentlyUpdated: 0 },
+    { total: 0, withRepository: 0, live: 0, recentlyUpdated: 0, blocked: 0 },
   );
 }
 

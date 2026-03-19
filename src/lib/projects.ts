@@ -2,12 +2,20 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+export const PROJECT_CATEGORIES = ['internal', 'client', 'product', 'content', 'research'] as const;
+export const PROJECT_STATUSES = ['active', 'blocked', 'paused', 'completed', 'archived'] as const;
+
+export type ProjectCategory = typeof PROJECT_CATEGORIES[number];
+export type ProjectStatus = typeof PROJECT_STATUSES[number];
+
 export interface ProjectRecord {
   id: string;
   name: string;
   description: string;
   repositoryUrl: string | null;
   productionUrl: string | null;
+  category: ProjectCategory | null;
+  status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -17,6 +25,8 @@ export interface CreateProjectInput {
   description?: string;
   repositoryUrl?: string | null;
   productionUrl?: string | null;
+  category?: ProjectCategory | null;
+  status?: ProjectStatus;
 }
 
 export interface UpdateProjectInput {
@@ -24,6 +34,8 @@ export interface UpdateProjectInput {
   description?: string;
   repositoryUrl?: string | null;
   productionUrl?: string | null;
+  category?: ProjectCategory | null;
+  status?: ProjectStatus;
 }
 
 interface ProjectStoreOptions {
@@ -64,6 +76,18 @@ function normalizeIsoDate(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function normalizeCategory(value: unknown): ProjectCategory | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase() as ProjectCategory;
+  return PROJECT_CATEGORIES.includes(v) ? v : null;
+}
+
+function normalizeStatus(value: unknown): ProjectStatus {
+  if (typeof value !== 'string') return 'active';
+  const v = value.trim().toLowerCase() as ProjectStatus;
+  return PROJECT_STATUSES.includes(v) ? v : 'active';
+}
+
 function createDefaultProjectRecord(raw: Record<string, unknown>, index: number): ProjectRecord {
   const now = new Date(0).toISOString();
 
@@ -73,6 +97,8 @@ function createDefaultProjectRecord(raw: Record<string, unknown>, index: number)
     description: normalizeString(raw.description) || '',
     repositoryUrl: normalizeNullableString(raw.repositoryUrl),
     productionUrl: normalizeNullableString(raw.productionUrl),
+    category: normalizeCategory(raw.category),
+    status: normalizeStatus(raw.status),
     createdAt: normalizeIsoDate(raw.createdAt) || now,
     updatedAt: normalizeIsoDate(raw.updatedAt) || now,
   };
@@ -110,8 +136,20 @@ function createStoreHelpers(options?: ProjectStoreOptions) {
   };
 }
 
-export async function listProjects(): Promise<ProjectRecord[]> {
-  return loadProjects();
+export interface ListProjectsFilter {
+  category?: ProjectCategory;
+  status?: ProjectStatus;
+}
+
+export async function listProjects(filter?: ListProjectsFilter): Promise<ProjectRecord[]> {
+  let projects = await loadProjects();
+  if (filter?.category) {
+    projects = projects.filter((p) => p.category === filter.category);
+  }
+  if (filter?.status) {
+    projects = projects.filter((p) => p.status === filter.status);
+  }
+  return projects;
 }
 
 export async function getProject(id: string): Promise<ProjectRecord | null> {
@@ -138,6 +176,8 @@ export async function createProject(
     description: normalizeString(input.description) || '',
     repositoryUrl: normalizeNullableString(input.repositoryUrl),
     productionUrl: normalizeNullableString(input.productionUrl),
+    category: normalizeCategory(input.category),
+    status: normalizeStatus(input.status),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -177,6 +217,10 @@ export async function updateProject(
     updates.productionUrl === undefined
       ? project.productionUrl
       : normalizeNullableString(updates.productionUrl);
+  project.category =
+    updates.category === undefined ? (project.category ?? null) : normalizeCategory(updates.category);
+  project.status =
+    updates.status === undefined ? (project.status ?? 'active') : normalizeStatus(updates.status);
   project.updatedAt = helpers.now();
 
   await saveProjects(projects);
