@@ -1,6 +1,20 @@
-import type { CreateProjectInput, ProjectCategory, ProjectRecord, ProjectStatus } from './projects';
+import type { CreateProjectInput } from './projects';
+import { PROJECT_CATEGORIES, PROJECT_STATUSES, type ProjectCategory, type ProjectStatus } from './projects-constants';
 export type { ProjectCategory, ProjectStatus };
-export { PROJECT_CATEGORIES, PROJECT_STATUSES } from './projects';
+export { PROJECT_CATEGORIES, PROJECT_STATUSES };
+
+// ProjectRecord type only (no fs import)
+export interface ProjectRecord {
+  id: string;
+  name: string;
+  description: string;
+  repositoryUrl: string | null;
+  productionUrl: string | null;
+  category: ProjectCategory | null;
+  status: ProjectStatus;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface ProjectFormState {
   name: string;
@@ -104,3 +118,4 @@ export function formatProjectTimestamp(value: string): string | null {
     year: 'numeric',
   }).format(date);
 }
+
