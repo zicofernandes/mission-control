@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { listTasks } from './tasks';
 
 export const PROJECT_CATEGORIES = ['internal', 'client', 'product', 'content', 'research'] as const;
 export const PROJECT_STATUSES = ['active', 'blocked', 'paused', 'completed', 'archived'] as const;
@@ -18,6 +19,8 @@ export interface ProjectRecord {
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
+  taskCount: number;
+  doneCount: number;
 }
 
 export interface CreateProjectInput {
@@ -101,6 +104,8 @@ function createDefaultProjectRecord(raw: Record<string, unknown>, index: number)
     status: normalizeStatus(raw.status),
     createdAt: normalizeIsoDate(raw.createdAt) || now,
     updatedAt: normalizeIsoDate(raw.updatedAt) || now,
+    taskCount: 0,
+    doneCount: 0,
   };
 }
 
@@ -143,6 +148,12 @@ export interface ListProjectsFilter {
 
 export async function listProjects(filter?: ListProjectsFilter): Promise<ProjectRecord[]> {
   let projects = await loadProjects();
+  const allTasks = await listTasks();
+  for (const project of projects) {
+    const projectTasks = allTasks.filter((t) => t.projectId === project.id && !t.archived);
+    project.taskCount = projectTasks.length;
+    project.doneCount = projectTasks.filter((t) => t.status === 'done').length;
+  }
   if (filter?.category) {
     projects = projects.filter((p) => p.category === filter.category);
   }
@@ -154,7 +165,14 @@ export async function listProjects(filter?: ListProjectsFilter): Promise<Project
 
 export async function getProject(id: string): Promise<ProjectRecord | null> {
   const projects = await loadProjects();
-  return projects.find((project) => project.id === id) || null;
+  const project = projects.find((p) => p.id === id) || null;
+  if (project) {
+    const allTasks = await listTasks();
+    const projectTasks = allTasks.filter((t) => t.projectId === project.id && !t.archived);
+    project.taskCount = projectTasks.length;
+    project.doneCount = projectTasks.filter((t) => t.status === 'done').length;
+  }
+  return project;
 }
 
 export async function createProject(
@@ -180,6 +198,8 @@ export async function createProject(
     status: normalizeStatus(input.status),
     createdAt: timestamp,
     updatedAt: timestamp,
+    taskCount: 0,
+    doneCount: 0,
   };
 
   projects.push(project);

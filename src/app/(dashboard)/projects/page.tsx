@@ -360,6 +360,27 @@ export default function ProjectsPage() {
                   {project.description || "No description provided."}
                 </p>
 
+                {/* Progress */}
+                {project.taskCount > 0 && (
+                  <div style={{ marginBottom: "14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Progress</span>
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                        {project.doneCount}/{project.taskCount} tasks ({Math.round((project.doneCount / project.taskCount) * 100)}%)
+                      </span>
+                    </div>
+                    <div style={{ height: "4px", borderRadius: "2px", backgroundColor: "var(--border)", overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%",
+                        borderRadius: "2px",
+                        backgroundColor: project.doneCount === project.taskCount ? "#4ade80" : "var(--accent)",
+                        width: `${Math.round((project.doneCount / project.taskCount) * 100)}%`,
+                        transition: "width 0.3s ease"
+                      }} />
+                    </div>
+                  </div>
+                )}
+
                 {/* Links */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>

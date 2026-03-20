@@ -38,13 +38,14 @@ type TaskFormState = {
   name: string;
   description: string;
   assignee: string;
+  projectId: string;
   schedule: string;
   nextRun: string;
   status: TaskColumn;
 };
 
 const EMPTY_FORM: TaskFormState = {
-  name: "", description: "", assignee: "", schedule: "", nextRun: "", status: "todo",
+  name: "", description: "", assignee: "", projectId: "", schedule: "", nextRun: "", status: "todo",
 };
 
 function toDatetimeLocalValue(value: string | null): string {
@@ -79,6 +80,7 @@ async function readJson(response: Response) {
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [projects, setProjects] = useState<{id:string,name:string}[]>([]);
   const [includeArchived, setIncludeArchived] = useState(false);
   const [form, setForm] = useState<TaskFormState>(EMPTY_FORM);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -105,6 +107,13 @@ export default function TasksPage() {
 
   useEffect(() => { void fetchTasks(); }, [fetchTasks]);
 
+  useEffect(() => {
+    fetch("/api/projects", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setProjects(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))); })
+      .catch(() => {});
+  }, []);
+
   const board = useMemo(() => buildTaskBoard(tasks), [tasks]);
   const summary = useMemo(() => summarizeTaskBoard(tasks), [tasks]);
 
@@ -120,6 +129,7 @@ export default function TasksPage() {
       name: task.name,
       description: task.description,
       assignee: task.assignee ?? "",
+      projectId: task.projectId ?? "",
       schedule: task.schedule ?? "",
       nextRun: toDatetimeLocalValue(task.nextRun),
       status: task.status,
@@ -144,6 +154,7 @@ export default function TasksPage() {
         name: form.name.trim(),
         description: form.description.trim(),
         assignee: form.assignee.trim() || null,
+        projectId: form.projectId || null,
         schedule: form.schedule.trim() || null,
         nextRun: toApiDate(form.nextRun),
         status: form.status,
@@ -368,6 +379,12 @@ export default function TasksPage() {
                 <select value={form.status} onChange={(e) => setForm((c) => ({ ...c, status: e.target.value as TaskColumn }))} style={inputStyle}>
                   {TASK_COLUMNS.map((col) => (
                     <option key={col} value={col}>{COLUMN_META[col].title}</option>
+                  ))}
+                </select>
+                <select value={form.projectId} onChange={(e) => setForm((c) => ({ ...c, projectId: e.target.value }))} style={inputStyle}>
+                  <option value="">— none —</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
                 <input value={form.assignee} onChange={(e) => setForm((c) => ({ ...c, assignee: e.target.value }))} placeholder="Assignee" style={inputStyle} />

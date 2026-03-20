@@ -11,6 +11,7 @@ export interface CreateTaskInput {
   description?: string;
   status?: TaskColumn;
   assignee?: string | null;
+  projectId?: string | null;
   schedule?: string | null;
   nextRun?: string | null;
 }
@@ -20,6 +21,7 @@ export interface UpdateTaskInput {
   description?: string;
   status?: TaskColumn;
   assignee?: string | null;
+  projectId?: string | null;
   schedule?: string | null;
   nextRun?: string | null;
 }
@@ -78,6 +80,7 @@ function createDefaultTaskRecord(raw: Record<string, unknown>, index: number): T
     status,
     position: typeof raw.position === 'number' && Number.isFinite(raw.position) ? raw.position : index,
     assignee: normalizeNullableString(raw.assignee),
+    projectId: normalizeNullableString(raw.projectId),
     archived,
     createdAt: normalizeIsoDate(raw.createdAt) || now,
     updatedAt: normalizeIsoDate(raw.updatedAt) || now,
@@ -176,6 +179,7 @@ export async function createTask(input: CreateTaskInput, options?: TaskStoreOpti
     status,
     position,
     assignee: normalizeNullableString(input.assignee),
+    projectId: normalizeNullableString(input.projectId),
     archived: false,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -230,6 +234,8 @@ export async function updateTask(
     updates.description === undefined ? task.description : normalizeString(updates.description) || '';
   task.assignee =
     updates.assignee === undefined ? task.assignee : normalizeNullableString(updates.assignee);
+  task.projectId =
+    updates.projectId === undefined ? (task.projectId ?? null) : normalizeNullableString(updates.projectId);
   task.schedule =
     updates.schedule === undefined ? task.schedule : normalizeNullableString(updates.schedule);
   task.nextRun = updates.nextRun === undefined ? task.nextRun : normalizeIsoDate(updates.nextRun);

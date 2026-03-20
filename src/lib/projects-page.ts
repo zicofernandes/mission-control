@@ -14,6 +14,8 @@ export interface ProjectRecord {
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
+  taskCount: number;
+  doneCount: number;
 }
 
 export interface ProjectFormState {

@@ -9,6 +9,7 @@ export interface TaskRecord {
   status: TaskColumn;
   position: number;
   assignee: string | null;
+  projectId: string | null;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
