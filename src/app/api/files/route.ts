@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
+export const dynamic = 'force-dynamic';
+
 import { resolveWorkspacePath } from "@/lib/workspaces";
 
 // Files to show in the memory browser
