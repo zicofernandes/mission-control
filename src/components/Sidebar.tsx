@@ -47,6 +47,7 @@ const navItems = [
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/activity", label: "Activity", icon: Activity },
   { href: "/memory", label: "Memory", icon: Brain },
+  { href: "/memory/daily", label: "Daily Logs", icon: Brain, indent: true },
   { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/cron", label: "Cron Jobs", icon: Timer },
   { href: "/sessions", label: "Sessions", icon: History },
@@ -232,6 +233,7 @@ export function Sidebar() {
                       !isActive
                         ? {
                             color: "var(--text-secondary)",
+                            ...(item.indent ? { paddingLeft: "2.5rem", fontSize: "12px" } : {}),
                             ...(item.highlight
                               ? {
                                   background:
@@ -245,11 +247,12 @@ export function Sidebar() {
                             color: "var(--text-primary)",
                             fontFamily: "var(--font-heading)",
                             fontWeight: 600,
+                            ...(item.indent ? { paddingLeft: "2.5rem", fontSize: "12px" } : {}),
                           }
                     }
                   >
                     <Icon
-                      className="w-5 h-5"
+                      className={item.indent ? "w-4 h-4" : "w-5 h-5"}
                       style={!isActive ? { color: "var(--text-muted)" } : undefined}
                     />
                     {item.label}
