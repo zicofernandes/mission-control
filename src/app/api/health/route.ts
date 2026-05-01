@@ -16,6 +16,9 @@ interface ServiceCheck {
   url?: string;
 }
 
+const IS_DARWIN = process.platform === 'darwin';
+const DEFAULT_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:19001/';
+
 async function checkUrl(url: string, timeoutMs = 5000): Promise<{ status: 'up' | 'down'; latency: number; httpCode?: number }> {
   const start = Date.now();
   try {
@@ -40,6 +43,29 @@ async function checkSystemdService(name: string): Promise<ServiceCheck> {
   }
 }
 
+async function checkMissionControlService(): Promise<ServiceCheck> {
+  if (IS_DARWIN) {
+    return { name: 'Mission Control', status: 'up', details: 'serving /api/health on darwin host' };
+  }
+
+  return checkSystemdService('mission-control');
+}
+
+async function checkGatewayService(): Promise<ServiceCheck> {
+  if (IS_DARWIN) {
+    const probe = await checkUrl(DEFAULT_GATEWAY_URL, 1500);
+    return {
+      name: 'OpenClaw Gateway',
+      status: probe.status,
+      latency: probe.latency,
+      details: probe.status === 'up' ? `reachable at ${DEFAULT_GATEWAY_URL}` : `unreachable at ${DEFAULT_GATEWAY_URL}`,
+      url: DEFAULT_GATEWAY_URL,
+    };
+  }
+
+  return checkSystemdService('openclaw-gateway');
+}
+
 async function checkPm2Service(name: string): Promise<ServiceCheck> {
   try {
     const { stdout } = await execAsync('pm2 jlist 2>/dev/null');
@@ -58,8 +84,8 @@ export async function GET() {
 
   // Internal services
   const [missionControl, gateway] = await Promise.all([
-    checkSystemdService('mission-control'),
-    checkSystemdService('openclaw-gateway'),
+    checkMissionControlService(),
+    checkGatewayService(),
   ]);
   checks.push({ ...missionControl, name: 'Mission Control' });
   checks.push({ ...gateway, name: 'OpenClaw Gateway' });
