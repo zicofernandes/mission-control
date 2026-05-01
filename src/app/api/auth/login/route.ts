@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { shouldUseSecureAuthCookie } from "@/lib/auth-cookie";
 
 // Simple in-memory rate limiter (per-IP, resets on server restart)
 // Sufficient for a personal dashboard — no external dependency needed
@@ -93,10 +94,9 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ success: true });
 
     // Set auth cookie (7 days expiry)
-    // secure=true in production (HTTPS), false in dev (HTTP localhost)
     response.cookies.set("mc_auth", process.env.AUTH_SECRET!, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: shouldUseSecureAuthCookie(request),
       sameSite: "lax",
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/",
