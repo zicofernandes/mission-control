@@ -11,7 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:seed": "prisma db seed",
     "prisma:validate": "prisma validate",
-    "test": "node --test --experimental-strip-types src/lib/*.test.ts"
+    "test": "node --test --experimental-strip-types --loader ./scripts/node-ts-extension-loader.mjs src/lib/*.test.ts"
   },
   "prisma": {
     "seed": "node --experimental-strip-types prisma/seed.ts"

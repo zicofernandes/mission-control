@@ -28,16 +28,42 @@ export async function PATCH(
 
     const body = await request.json();
     
-    // Build update payload with only provided fields
+    // Build update payload with only supported provided fields. Keep this route
+    // narrow enough to avoid accidental writes, but include execution lifecycle
+    // metadata so agents can update proof/stale state without replacing tasks.
     const updatePayload: Record<string, unknown> = { id };
-    if ('status' in body) {
-      updatePayload.status = body.status;
-    }
-    if ('assignee' in body) {
-      updatePayload.assignee = body.assignee;
-    }
-    if ('name' in body) {
-      updatePayload.name = body.name;
+    const allowedFields = [
+      'status',
+      'assignee',
+      'name',
+      'description',
+      'projectId',
+      'schedule',
+      'nextRun',
+      'sourceSystem',
+      'sourceRef',
+      'ownerAgent',
+      'operatorAgent',
+      'ownerHuman',
+      'priority',
+      'runnerType',
+      'runnerSession',
+      'jobRunId',
+      'lastHeartbeatAt',
+      'lastProofAt',
+      'proofPath',
+      'logPath',
+      'completionCriteria',
+      'blockedReason',
+      'lifecycleStatus',
+      'staleAfterMinutes',
+      'incidentPath',
+    ];
+
+    for (const field of allowedFields) {
+      if (field in body) {
+        updatePayload[field] = body[field];
+      }
     }
 
     const task = await updateTask(id, updatePayload);

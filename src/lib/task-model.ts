@@ -16,4 +16,22 @@ export interface TaskRecord {
   archivedAt: string | null;
   schedule: string | null;
   nextRun: string | null;
+  sourceSystem?: string | null;
+  sourceRef?: string | null;
+  ownerAgent?: string | null;
+  operatorAgent?: string | null;
+  ownerHuman?: string | null;
+  priority?: string | null;
+  runnerType?: string | null;
+  runnerSession?: string | null;
+  jobRunId?: string | null;
+  lastHeartbeatAt?: string | null;
+  lastProofAt?: string | null;
+  proofPath?: string | null;
+  logPath?: string | null;
+  completionCriteria?: string | null;
+  blockedReason?: string | null;
+  lifecycleStatus?: string | null;
+  staleAfterMinutes?: number | null;
+  incidentPath?: string | null;
 }

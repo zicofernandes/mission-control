@@ -1,4 +1,5 @@
-import { PROJECT_CATEGORIES, PROJECT_STATUSES, ProjectCategory, ProjectStatus, createProject, deleteProject, getProject, listProjects, updateProject } from './projects';
+import { PROJECT_CATEGORIES, PROJECT_STATUSES, createProject, deleteProject, getProject, listProjects, updateProject } from './projects';
+import type { ProjectCategory, ProjectStatus } from './projects';
 
 function json(data: unknown, init?: ResponseInit): Response {
   return Response.json(data, init);

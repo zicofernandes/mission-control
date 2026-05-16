@@ -156,3 +156,56 @@ test('tasks route validates missing ids and invalid actions', async () => {
   );
   assert.equal(invalidActionResponse.status, 400);
 });
+
+test('tasks route persists lifecycle metadata on create and update', async () => {
+  const { root, filePath } = makeTempTasksPath();
+  const previousTasksPath = process.env.TASKS_DATA_PATH;
+
+  try {
+    process.env.TASKS_DATA_PATH = filePath;
+
+    const createResponse = await handleTasksPost(
+      new Request('http://localhost/api/tasks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Run agent job',
+          operatorAgent: 'athena',
+          ownerAgent: 'elon',
+          priority: 'P1',
+          lifecycleStatus: 'ready',
+          staleAfterMinutes: 30,
+        }),
+      }),
+    );
+
+    const created = await readJson(createResponse) as Record<string, unknown>;
+    assert.equal(created.operatorAgent, 'athena');
+    assert.equal(created.lifecycleStatus, 'ready');
+
+    const updateResponse = await handleTasksPut(
+      new Request('http://localhost/api/tasks', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          id: created.id,
+          lifecycleStatus: 'running',
+          runnerSession: 'mc-12345678',
+          logPath: '/tmp/mc-12345678.log',
+        }),
+      }),
+    );
+
+    const updated = await readJson(updateResponse) as Record<string, unknown>;
+    assert.equal(updated.lifecycleStatus, 'running');
+    assert.equal(updated.runnerSession, 'mc-12345678');
+    assert.equal(updated.logPath, '/tmp/mc-12345678.log');
+  } finally {
+    if (previousTasksPath === undefined) {
+      delete process.env.TASKS_DATA_PATH;
+    } else {
+      process.env.TASKS_DATA_PATH = previousTasksPath;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

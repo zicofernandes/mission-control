@@ -121,3 +121,51 @@ test('tasks store normalizes legacy tasks.json records for existing UI consumers
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('tasks store persists agent execution lifecycle metadata', async () => {
+  const { root, filePath } = makeTempTasksPath();
+  const previousTasksPath = process.env.TASKS_DATA_PATH;
+
+  try {
+    process.env.TASKS_DATA_PATH = filePath;
+
+    const task = await createTask(
+      {
+        name: 'Build execution layer',
+        status: 'in_progress',
+        sourceSystem: 'mission_control',
+        operatorAgent: 'athena',
+        ownerAgent: 'elon',
+        priority: 'P1',
+        runnerType: 'tmux',
+        runnerSession: 'mc-task-1',
+        lifecycleStatus: 'running',
+        staleAfterMinutes: 30,
+        completionCriteria: 'npm test passes',
+      },
+      { idFactory: () => 'task-lifecycle' },
+    );
+
+    assert.equal(task.operatorAgent, 'athena');
+    assert.equal(task.ownerAgent, 'elon');
+    assert.equal(task.lifecycleStatus, 'running');
+    assert.equal(task.staleAfterMinutes, 30);
+
+    const updated = await updateTask('task-lifecycle', {
+      lifecycleStatus: 'succeeded',
+      proofPath: '/tmp/proof.md',
+      lastProofAt: '2026-05-16T18:00:00Z',
+    });
+
+    assert.equal(updated?.lifecycleStatus, 'succeeded');
+    assert.equal(updated?.proofPath, '/tmp/proof.md');
+    assert.equal(updated?.lastProofAt, '2026-05-16T18:00:00.000Z');
+  } finally {
+    if (previousTasksPath === undefined) {
+      delete process.env.TASKS_DATA_PATH;
+    } else {
+      process.env.TASKS_DATA_PATH = previousTasksPath;
+    }
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

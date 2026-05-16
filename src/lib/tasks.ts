@@ -6,7 +6,28 @@ import { TASK_COLUMNS, type TaskColumn, type TaskRecord } from './task-model';
 export { TASK_COLUMNS };
 export type { TaskColumn, TaskRecord };
 
-export interface CreateTaskInput {
+export interface TaskLifecycleInput {
+  sourceSystem?: string | null;
+  sourceRef?: string | null;
+  ownerAgent?: string | null;
+  operatorAgent?: string | null;
+  ownerHuman?: string | null;
+  priority?: string | null;
+  runnerType?: string | null;
+  runnerSession?: string | null;
+  jobRunId?: string | null;
+  lastHeartbeatAt?: string | null;
+  lastProofAt?: string | null;
+  proofPath?: string | null;
+  logPath?: string | null;
+  completionCriteria?: string | null;
+  blockedReason?: string | null;
+  lifecycleStatus?: string | null;
+  staleAfterMinutes?: number | null;
+  incidentPath?: string | null;
+}
+
+export interface CreateTaskInput extends TaskLifecycleInput {
   name: string;
   description?: string;
   status?: TaskColumn;
@@ -16,7 +37,7 @@ export interface CreateTaskInput {
   nextRun?: string | null;
 }
 
-export interface UpdateTaskInput {
+export interface UpdateTaskInput extends TaskLifecycleInput {
   name?: string;
   description?: string;
   status?: TaskColumn;
@@ -68,12 +89,59 @@ function normalizeIsoDate(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function normalizeNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+const LIFECYCLE_STRING_FIELDS = [
+  'sourceSystem',
+  'sourceRef',
+  'ownerAgent',
+  'operatorAgent',
+  'ownerHuman',
+  'priority',
+  'runnerType',
+  'runnerSession',
+  'jobRunId',
+  'proofPath',
+  'logPath',
+  'completionCriteria',
+  'blockedReason',
+  'lifecycleStatus',
+  'incidentPath',
+] as const;
+
+const LIFECYCLE_DATE_FIELDS = ['lastHeartbeatAt', 'lastProofAt'] as const;
+
+function applyLifecycleFields(task: TaskRecord, input: TaskLifecycleInput | Record<string, unknown>, partial = false): void {
+  for (const field of LIFECYCLE_STRING_FIELDS) {
+    if (!partial || field in input) {
+      task[field] = normalizeNullableString(input[field]);
+    }
+  }
+
+  for (const field of LIFECYCLE_DATE_FIELDS) {
+    if (!partial || field in input) {
+      task[field] = normalizeIsoDate(input[field]);
+    }
+  }
+
+  if (!partial || 'staleAfterMinutes' in input) {
+    task.staleAfterMinutes = normalizeNullableNumber(input.staleAfterMinutes);
+  }
+}
+
 function createDefaultTaskRecord(raw: Record<string, unknown>, index: number): TaskRecord {
   const now = new Date(0).toISOString();
   const status = isTaskColumn(raw.status) ? raw.status : 'todo';
   const archived = raw.archived === true;
 
-  return {
+  const task: TaskRecord = {
     id: normalizeString(raw.id) || `task-${index + 1}`,
     name: normalizeString(raw.name) || 'Untitled task',
     description: normalizeString(raw.description) || '',
@@ -88,6 +156,9 @@ function createDefaultTaskRecord(raw: Record<string, unknown>, index: number): T
     schedule: normalizeNullableString(raw.schedule),
     nextRun: normalizeIsoDate(raw.nextRun),
   };
+
+  applyLifecycleFields(task, raw);
+  return task;
 }
 
 function sortTasks(tasks: TaskRecord[]): TaskRecord[] {
@@ -188,6 +259,7 @@ export async function createTask(input: CreateTaskInput, options?: TaskStoreOpti
     nextRun: normalizeIsoDate(input.nextRun),
   };
 
+  applyLifecycleFields(task, input);
   tasks.push(task);
   await saveTasks(tasks);
   return task;
@@ -239,6 +311,7 @@ export async function updateTask(
   task.schedule =
     updates.schedule === undefined ? task.schedule : normalizeNullableString(updates.schedule);
   task.nextRun = updates.nextRun === undefined ? task.nextRun : normalizeIsoDate(updates.nextRun);
+  applyLifecycleFields(task, updates, true);
   task.updatedAt = helpers.now();
 
   await saveTasks(tasks);
