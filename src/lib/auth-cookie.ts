@@ -19,6 +19,26 @@ function isLocalHostname(hostname: string): boolean {
   );
 }
 
+function isPrivateHttpHostname(hostname: string): boolean {
+  const parts = hostname.split(".").map((part) => Number(part));
+
+  if (
+    parts.length === 4 &&
+    parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)
+  ) {
+    const [a, b] = parts;
+
+    return (
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127)
+    );
+  }
+
+  return hostname.endsWith(".ts.net");
+}
+
 export function shouldUseSecureAuthCookie(request: NextRequest): boolean {
   const host =
     request.headers.get("x-forwarded-host") ||
@@ -39,6 +59,10 @@ export function shouldUseSecureAuthCookie(request: NextRequest): boolean {
     ?.trim()
     ?.toLowerCase();
   const protocol = forwardedProto || request.nextUrl.protocol.replace(":", "");
+
+  if (protocol === "http" && isPrivateHttpHostname(hostname)) {
+    return false;
+  }
 
   return protocol === "https" || process.env.NODE_ENV === "production";
 }
